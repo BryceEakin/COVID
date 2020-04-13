@@ -21,7 +21,8 @@ __ALL__ = [
     'ApplyToProteinBatch',
     'ApplyReducingToProteinBatch'
     'protein_batch_to_padded_batch',
-    'ProteinBatchToPaddedBatch'
+    'ProteinBatchToPaddedBatch',
+    'BatchMolGraph'
 ]
 
 POOL_ATTRIBUTES = {'kernel_size', 'stride', 'padding', 'ceil_mode'}
