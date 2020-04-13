@@ -6,6 +6,8 @@ import typing as typ
 import numpy as np
 import math
 
+import chemprop.features
+
 from torch.nn.modules import pooling 
 from torch.nn.modules.conv import _ConvNd
 
@@ -314,3 +316,18 @@ def protein_batch_to_padded_batch(pbatch):
 class ProteinBatchToPaddedBatch(nn.Module):
     def forward(self, x):
         return protein_batch_to_padded_batch(x)
+
+
+class BatchMolGraph(chemprop.features.BatchMolGraph):
+    def to(self, *args, **kwargs):
+        self.f_atoms = self.f_atoms.to(*args, **kwargs)
+        self.f_bonds = self.f_bonds.to(*args, **kwargs)
+        self.a2b = self.a2b.to(*args, **kwargs)
+        self.b2a = self.b2a.to(*args, **kwargs)
+        self.b2revb = self.b2revb.to(*args, **kwargs)
+        if self.b2b is not None:
+            self.b2b = self.b2b.to(*args, **kwargs)
+        if self.a2a is not None:
+            self.a2a = self.a2a.to(*args, **kwargs)
+            
+        return self
