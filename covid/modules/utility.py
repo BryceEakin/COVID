@@ -11,6 +11,7 @@ NONLINEARITIES = {'relu': nn.ReLU, 'silu': SiLU, 'sigmoid': nn.Sigmoid, 'tanh': 
 
 class Squeeze(nn.Module):
     def __init__(self, axis):
+        super().__init__()
         self.axis=axis
         
     def __call__(self, x):

@@ -162,6 +162,9 @@ class ProteinBatch(object):
             return
         
         raise ValueError("Cannot index on the batch index of a ProteinBatch: " + repr(idx))
+
+    def to(self, *args, **kwargs):
+        return ProteinBatch(self._data.to(*args, **kwargs), self._batch_offsets, self._batch_lengths)
         
         
 class ApplyToProteinBatch(nn.Module):
