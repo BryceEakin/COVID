@@ -8,8 +8,8 @@ __ALL__ = ['MPNEncoder']
 
 class MPNEncoder(nn.Module):
     def __init__(self, 
-                 atom_fdim: int = 200,
-                 bond_fdim: int = 200,
+                 atom_fdim: int = 133,
+                 bond_fdim: int = 147,
                  activation: str = 'ReLU',
                  hidden_size: int = 300,
                  bias: bool = False,
