@@ -109,8 +109,8 @@ class MPNEncoder(nn.Module):
                 cur_hiddens = atom_hiddens.narrow(0, a_start, a_size)
                 mol_vec = cur_hiddens # (num_atoms, hidden_size)
 
-                #mol_vec = mol_vec.sum(dim=0) / a_size
-                mol_vec = mol_vec.max(0).values
+                mol_vec = mol_vec.sum(dim=0) / a_size
+                #mol_vec = mol_vec.mean(0).values
                 mol_vecs.append(mol_vec)
                 
         mol_vecs = T.stack(mol_vecs, dim=0)  # (num_molecules, hidden_size)

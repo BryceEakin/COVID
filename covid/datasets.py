@@ -25,10 +25,11 @@ def collate_stitch_data(list_of_samples):
     return chem_graphs, chem_features, proteins, results
     
 class StitchDataset(T.utils.data.Dataset):
-    def __init__(self, base_folder="./data"):
+    def __init__(self, base_folder):
         self.all_data = None
         self.all_proteins = None
         self.all_chemicals = None
+        self.neg_samples = None
         self._folder = base_folder
     
     def _deferred_load(self):
@@ -49,20 +50,36 @@ class StitchDataset(T.utils.data.Dataset):
             self.all_proteins = pkl.load(f)
         with gzip.open(os.path.join(self._folder, 'stitch_chemicals.pkl.gz'), 'rb') as f:
             self.all_chemicals = pkl.load(f)
+
+        self.neg_samples = list(zip(
+            np.random.choice(
+                list(self.all_chemicals.keys()),
+                self.all_data.shape[0]
+            ), 
+            np.random.choice(
+                list(self.all_proteins.keys()),
+                self.all_data.shape[0]
+            )
+        ))
     
     def __len__(self):
         if self.all_data is None:
             self._deferred_load()
-        return self.all_data.shape[0]
+        return self.all_data.shape[0] * 2
     
     def __getitem__(self, idx):
         if self.all_data is None:
             self._deferred_load()
-        row = self.all_data.iloc[idx]
+
+        if idx >= self.all_data.shape[0]:
+            row = pd.Series(list(self.neg_samples[idx-self.all_data.shape[0]]) + [0.0]*5, index=self.all_data.columns)
+        else:
+            row = self.all_data.iloc[idx]
+
         _,_,_,_, chem_graph, chem_features = self.all_chemicals[row['item_id_a']]
-        chem_features = T.tensor(chem_features)
+        chem_features = T.tensor(chem_features, dtype=T.float32)
         protein = encode_protein(self.all_proteins[row['item_id_b']])
         
-        targets = T.tensor(row[['activation', 'binding', 'catalysis', 'inhibition', 'reaction']].values.astype(float))
+        targets = T.tensor(row[['activation', 'binding', 'catalysis', 'inhibition', 'reaction']].values.astype(float), dtype=T.float32)
         
         return chem_graph, chem_features, protein, targets

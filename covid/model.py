@@ -26,9 +26,6 @@ class CovidModel(nn.Module):
         chem_out = self.chem_model(chem_batch, chem_f_batch)
         protein_out = self.protein_model(protein_batch)
         
-        print(chem_out.shape)
-        print(protein_out.shape)
-        
         result = self.final_layers(T.cat([chem_out, protein_out], -1))
         return result
 
@@ -39,28 +36,25 @@ def create_protein_model(dropout = 0.2, outdim=600):
         apply_to_protein_batch(nn.Conv1d(23, 512, (1, ), 1, 0)),
         
         #Do some resnet
+        create_resnet_block_1d(512, 64, inner_kernel=3, for_protein_batch=True),
         create_resnet_block_1d(512, 64, inner_kernel=5, for_protein_batch=True),
         create_resnet_block_1d(512, 64, inner_kernel=7, for_protein_batch=True),
-        create_resnet_block_1d(512, 64, inner_kernel=5, for_protein_batch=True),
-        create_resnet_block_1d(512, 64, inner_kernel=7, for_protein_batch=True),
+        create_resnet_block_1d(512, 64, inner_kernel=11, for_protein_batch=True),
         
         # Scale it down
-        DownscaleConv1d(512, 1024, 4, maxpool=True, for_protein_batch=True),
+        DownscaleConv1d(512, 512, 4, maxpool=True, for_protein_batch=True),
         apply_to_protein_batch(nn.Dropout(dropout)),
         
         #Do some resnet
-        create_resnet_block_1d(1024, 128, inner_kernel=3, for_protein_batch=True),
-        create_resnet_block_1d(1024, 128, inner_kernel=5, for_protein_batch=True),
-        create_resnet_block_1d(1024, 128, inner_kernel=3, for_protein_batch=True),
-        create_resnet_block_1d(1024, 128, inner_kernel=5, for_protein_batch=True),
+        create_resnet_block_1d(512, 128, inner_kernel=3, for_protein_batch=True),
+        create_resnet_block_1d(512, 128, inner_kernel=5, for_protein_batch=True),
         
         # Scale it down again
-        DownscaleConv1d(1024, 2048,4,'silu', maxpool=True, for_protein_batch=True),
+        DownscaleConv1d(512, 1024,4,'silu', maxpool=True, for_protein_batch=True),
         
         # Final resneting
-        create_resnet_block_1d(2048, 128, inner_kernel=3, for_protein_batch=True),
-        create_resnet_block_1d(2048, 128, inner_kernel=5, for_protein_batch=True),
-        create_resnet_block_1d(2048, 128, inner_kernel=3, for_protein_batch=True),
+        create_resnet_block_1d(1024, 256, inner_kernel=7, for_protein_batch=True),
+        create_resnet_block_1d(1024, 256, inner_kernel=3, for_protein_batch=True),
         
         apply_to_protein_batch(nn.MaxPool1d(100000, ceil_mode=True)),
         
@@ -69,7 +63,7 @@ def create_protein_model(dropout = 0.2, outdim=600):
         
         Squeeze(-1),
         nn.Dropout(dropout),
-        nn.Linear(2048, 1024),
+        nn.Linear(1024, 1024),
         nn.ReLU(),
         nn.Linear(1024,outdim),
         #nn.Tanhshrink(),

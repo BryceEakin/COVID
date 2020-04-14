@@ -127,3 +127,4 @@ dmypy.json
 
 # raw data files
 raw_data/
+data/**/*
