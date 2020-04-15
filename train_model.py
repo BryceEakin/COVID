@@ -83,8 +83,6 @@ if __name__ == '__main__':
     protein_model = create_protein_model(dropout=DROPOUT_RATE)
     model = CovidModel(chem_model, protein_model, dropout=DROPOUT_RATE)
 
-    model = RandomModel()
-
     logging.info("Pushing model to device")
     model.to(DEVICE)
 
