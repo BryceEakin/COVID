@@ -40,7 +40,7 @@ T.manual_seed(4 + TRAINING_FOLD)
 def initialize_logger(output_dir='./logs'):
     if not os.path.exists("./logs"):
         os.mkdir("./logs")
-        
+
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
      
@@ -87,11 +87,15 @@ if __name__ == '__main__':
     model.to(DEVICE)
 
     logging.info("Initializing Datasets")
-    data = covid.datasets.StitchDataset(f'./data/train_{TRAINING_FOLD:02}', neg_rate = SYNTHETIC_NEGATIVE_RATE)
-    dataloader = create_dataloader(data, BATCH_SIZE)
+    data = covid.datasets.StitchDataset(f'./data/train_{TRAINING_FOLD:02}')
+    dataloader = create_dataloader(
+        data, BATCH_SIZE, neg_rate = SYNTHETIC_NEGATIVE_RATE, num_workers=1
+    )
 
-    validation_data = covid.datasets.StitchDataset(f'./data/valid_{TRAINING_FOLD:02}', neg_rate=0.0)
-    validation_dataloader = create_dataloader(validation_data, BATCH_SIZE)
+    validation_data = covid.datasets.StitchDataset(f'./data/valid_{TRAINING_FOLD:02}')
+    validation_dataloader = create_dataloader(
+        validation_data, BATCH_SIZE, neg_rate=0.2, num_workers=1
+    )
 
     logging.info("Initializing optimizers/schedulers")
     optim = T.optim.Adam(model.parameters(), lr=1e-4, betas=(0.95, 0.99))
