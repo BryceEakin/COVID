@@ -1,0 +1,1 @@
+MODE_NAMES = ['Activation', 'Binding', 'Catalysis', 'Inhibition', 'Reaction']

@@ -7,6 +7,13 @@ from .modules import create_resnet_block_1d, DownscaleConv1d, Squeeze
 
 import numpy as np
 
+from .utils import is_notebook
+
+if is_notebook():
+    from tqdm.notebook import tqdm
+else:
+    from tqdm import tqdm
+
 __all__ = [
     "CovidModel",
     "RandomModel",
@@ -139,7 +146,7 @@ def calculate_average_loss_and_accuracy(model, dl, device):
     fn = np.zeros(5)
     tn = np.zeros(5)
     
-    for batch in dl:
+    for batch in tqdm(dl):
         chem_graphs, chem_features, proteins, target = batch
         result, target, loss, weight = run_model(model, batch, device)
         

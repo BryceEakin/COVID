@@ -8,6 +8,7 @@ import pickle as pkl
 import gzip
 
 import random
+import itertools
 
 from .utils import CHEMPROP_ARGS
 
@@ -29,12 +30,13 @@ def collate_stitch_data(list_of_samples):
     return chem_graphs, chem_features, proteins, results
     
 class StitchDataset(T.utils.data.Dataset):
-    def __init__(self, base_folder):
+    def __init__(self, base_folder, neg_rate=1.0):
         self.all_data = None
         self.all_proteins = None
         self.all_chemicals = None
         self.neg_samples = None
         self._folder = base_folder
+        self._neg_rate = neg_rate
     
     def _deferred_load(self):
         self.all_data = pd.read_csv(
@@ -55,21 +57,20 @@ class StitchDataset(T.utils.data.Dataset):
         with gzip.open(os.path.join(self._folder, 'stitch_chemicals.pkl.gz'), 'rb') as f:
             self.all_chemicals = pkl.load(f)
 
-        self.neg_samples = list(zip(
-            np.random.choice(
-                list(self.all_chemicals.keys()),
-                self.all_data.shape[0]
-            ), 
-            np.random.choice(
-                list(self.all_proteins.keys()),
-                self.all_data.shape[0]
-            )
-        ))
+        if self._neg_rate > 0.0:
+            possible_negatives = set(
+                itertools.product(self.all_chemicals.keys(), self.all_proteins.keys())
+            ).difference(self.all_data[['item_it_a', 'item_id_b']].itertuples(name=None, index=False))
+
+            self.neg_samples = list(np.random.choice(
+                possible_negatives,
+                min(len(possible_negatives), self.all_data.shape[0] * self._neg_rate)
+            ))
     
     def __len__(self):
         if self.all_data is None:
             self._deferred_load()
-        return self.all_data.shape[0] * 2
+        return self.all_data.shape[0] + len(self.neg_samples)
     
     def __getitem__(self, idx):
         if self.all_data is None:
