@@ -22,7 +22,7 @@ from covid.utils import getch
 import logging
 
 DROPOUT_RATE = 0.4
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 VALIDATION_FREQUENCY = 0.2
 SYNTHETIC_NEGATIVE_RATE = 0.2
 
@@ -149,15 +149,15 @@ if __name__ == '__main__':
     threading.Thread(target=wait_for_q, daemon=True).start()
 
     epoch_length = len(dataloader)
+    logging.info(epoch_length, "Iterations per epoch!")
 
     for epoch in tqdm(range(epoch, 100)):
         logging.info(f"Beginning epoch {epoch}")
-        idx = 0
         
         model.train()
         pct_epoch = 0
         
-        for batch in tqdm(dataloader, leave=False):
+        for idx, batch in enumerate(tqdm(dataloader, leave=False)):
 
             model.zero_grad()
             _, _, loss, _ = run_model(model, batch, DEVICE)
@@ -167,7 +167,6 @@ if __name__ == '__main__':
             optim.step()
             warmup.step()
                 
-            idx += BATCH_SIZE
             pct_epoch = min(1.0, idx/epoch_length)
             
             losses.append((epoch + pct_epoch, loss.item()))

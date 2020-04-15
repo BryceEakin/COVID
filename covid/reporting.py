@@ -10,7 +10,7 @@ def plot_loss(ax, loss_x, loss_y, valid_x, valid_y, period=None):
     x,y = loss_x, loss_y
     
     if period is None:
-        period = int(len(x)//500)
+        period = max(1, int(len(x)//500))
         
     x = np.reshape(x[:((len(x)//period)*period)],(-1,period)).mean(1)
     y_grouped = np.reshape(y[:((len(y)//period)*period)],(-1,period))
