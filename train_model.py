@@ -148,6 +148,8 @@ if __name__ == '__main__':
 
     threading.Thread(target=wait_for_q, daemon=True).start()
 
+    epoch_length = len(dataloader)
+
     for epoch in tqdm(range(epoch, 100)):
         logging.info(f"Beginning epoch {epoch}")
         idx = 0
@@ -166,7 +168,7 @@ if __name__ == '__main__':
             warmup.step()
                 
             idx += BATCH_SIZE
-            pct_epoch = min(1.0, idx/len(data))
+            pct_epoch = min(1.0, idx/epoch_length)
             
             losses.append((epoch + pct_epoch, loss.item()))
         

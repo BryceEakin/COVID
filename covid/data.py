@@ -249,10 +249,13 @@ class ApplyConvToProteinBatch(nn.Module):
         if not isinstance(batch, ProteinBatch):
             raise ValueError("Expected ProteinBatch, got " + str(batch.__class__))
         
-        padding = min(
-            batch.batch_offsets[i+1] - (batch.batch_offsets[i] + batch.batch_lengths[i])
-            for i in range(len(batch.batch_lengths)-1)
-        )
+        if len(batch.batch_offsets) == 1:
+            padding = 0
+        else:
+            padding = min(
+                batch.batch_offsets[i+1] - (batch.batch_offsets[i] + batch.batch_lengths[i])
+                for i in range(len(batch.batch_lengths)-1)
+            )
         
         if (self.kernel - 1)/2 > padding:
             result = [
