@@ -39,7 +39,7 @@ def plot_loss(ax, loss_x, loss_y, valid_x, valid_y, period=None):
 
 def plot_stat(ax, x, stat, title):
     for i, name in enumerate(MODE_NAMES):
-        ax.plot(stat[:,i], lw=(2.0 if name == 'Inhibition' else 0.5), label=name)
+        ax.plot(x, stat[:,i], lw=(2.0 if name == 'Inhibition' else 0.5), label=name)
     ax.legend(loc='best')
     ax.set_ylabel(title)
 
@@ -56,7 +56,7 @@ def get_performance_plots(losses, validation_stats, period=None):
         tp, fp, tn, fn = zip(*valid_conf)
         tp, fp, tn, fn = np.stack(tp), np.stack(fp), np.stack(tn), np.stack(fn)
 
-        accuracy = (tp+tn)/(tp+tn+fp+fn)
+        accuracy = np.stack(valid_acc)
         plot_stat(axes[0,1], valid_x, accuracy, 'Accuracy')
         
         precision = tp/np.maximum(tp+fp, 1e-5)
