@@ -12,7 +12,7 @@ import covid
 from covid.data import *
 from covid.datasets import StitchDataset, create_data_split, create_dataloader
 from covid.model import (CovidModel, calculate_average_loss_and_accuracy,
-                         create_protein_model, run_model)
+                         create_protein_model, run_model, RandomModel)
 from covid.modules import *
 from covid.modules.chemistry import MPNEncoder
 from covid.reporting import get_performance_plots
@@ -83,6 +83,8 @@ if __name__ == '__main__':
     protein_model = create_protein_model(dropout=DROPOUT_RATE)
     model = CovidModel(chem_model, protein_model, dropout=DROPOUT_RATE)
 
+    model = RandomModel()
+
     logging.info("Pushing model to device")
     model.to(DEVICE)
 
@@ -143,13 +145,13 @@ if __name__ == '__main__':
         global interrupted
         while True:
             ch = getch()
-            if ch == b'q' or ch == b'\x03':
+            if ch in (b'q', 'q', b'\x03', '\x03'):
                 interrupted = True
+                break
 
     threading.Thread(target=wait_for_q, daemon=True).start()
 
     epoch_length = len(dataloader)
-    logging.info(epoch_length, "Iterations per epoch!")
 
     for epoch in tqdm(range(epoch, 100)):
         logging.info(f"Beginning epoch {epoch}")
