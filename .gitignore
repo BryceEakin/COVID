@@ -128,3 +128,5 @@ dmypy.json
 # raw data files
 raw_data/
 data/**/*
+checkpoints/*
+training_state*
