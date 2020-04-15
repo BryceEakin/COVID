@@ -23,7 +23,7 @@ __ALL__ = [
 def collate_stitch_data(list_of_samples):
     chem_graphs, chem_features, proteins, results = zip(*list_of_samples)
     
-    chem_graphs = BatchMolGraph(chem_graphs, CHEMPROP_ARGS)
+    chem_graphs = BatchMolGraph(chem_graphs)
     chem_features = T.stack(chem_features)
     proteins = create_protein_batch(proteins)
     results = T.stack(results)

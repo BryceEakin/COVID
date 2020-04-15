@@ -22,7 +22,7 @@ from covid.utils import getch
 import logging
 
 DROPOUT_RATE = 0.4
-BATCH_SIZE = 16
+BATCH_SIZE = 32
 VALIDATION_FREQUENCY = 0.2
 SYNTHETIC_NEGATIVE_RATE = 0.2
 

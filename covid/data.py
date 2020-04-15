@@ -62,6 +62,9 @@ class ProteinBatch(object):
         if batch_lengths[-1] + batch_offsets[-1] > data.shape[-1]:
             raise ValueError(f"Supplied batch definitions out of bounds for suppied tensor to ProteinBatch: {batch_offsets}; {batch_lengths}")
         
+        if len(batch_lengths) == 0:
+            raise ValueError(f"Supplied batch definitions empty?")
+        
         self._data = data
         self._batch_offsets = tuple(batch_offsets)
         self._batch_lengths = tuple(batch_lengths)
