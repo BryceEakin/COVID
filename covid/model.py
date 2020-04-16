@@ -148,6 +148,7 @@ def calculate_average_loss_and_accuracy(model, dl, device):
     
     for batch in tqdm(dl):
         chem_graphs, chem_features, proteins, target = batch
+        model.zero_grad()
         result, target, loss, weight = run_model(model, batch, device)
         
         total_loss += loss.item() * result.shape[0]

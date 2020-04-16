@@ -34,7 +34,7 @@ def plot_loss(ax, loss_x, loss_y, valid_x, valid_y, period=None):
 
     ax.plot(x, y, label='model (validation)', c='C1')
 
-    ax.plot((x[0], x[-1]), (0.358, 0.358), c='g', ls=':', lw=1.5, label='random baseline')
+    ax.plot((x[0], x[-1]), (0.422, 0.422), c='g', ls=':', lw=1.5, label='random baseline')
     ax.legend()
 
 def plot_stat(ax, x, stat, title):

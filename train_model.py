@@ -22,13 +22,13 @@ from covid.utils import getch
 import logging
 
 DROPOUT_RATE = 0.4
-BATCH_SIZE = 16
+BATCH_SIZE = 24
 VALIDATION_FREQUENCY = 0.2
 SYNTHETIC_NEGATIVE_RATE = 0.2
 
 DEVICE = 'cuda'
 
-TRAINING_FOLD = 1
+TRAINING_FOLD = 3
 
 
 # set random seeds
@@ -47,14 +47,14 @@ def initialize_logger(output_dir='./logs'):
     # create console handler and set level to info
     handler = logging.StreamHandler()
     handler.setLevel(logging.INFO)
-    formatter = logging.Formatter("%(levelname)s - %(message)s")
+    formatter = logging.Formatter("%(asctime)s | [%(levelname)s] %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
     # create debug file handler and set level to debug
     handler = logging.FileHandler(os.path.join(output_dir, f"debug_{TRAINING_FOLD:02}.log"), "w")
     handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter("%(levelname)s - %(message)s")
+    formatter = logging.Formatter("[%(levelname)s] %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
@@ -100,6 +100,12 @@ if __name__ == '__main__':
     logging.info("Initializing optimizers/schedulers")
     optim = T.optim.Adam(model.parameters(), lr=1e-4, betas=(0.95, 0.99))
     warmup = LinearWarmupScheduler(optim, 2000)
+    scheduler = T.optim.lr_scheduler.ReduceLROnPlateau(
+        optim, 
+        factor=0.1**0.125, 
+        patience=1,
+        min_lr=1e-7
+    )
 
     losses = []
     validation_stats = []
@@ -125,6 +131,8 @@ if __name__ == '__main__':
         model.load_state_dict(state['model'])
         optim.load_state_dict(state['optim'])
         warmup.load_state_dict(state['warmup'])
+        if 'scheduler' in state:
+            scheduler.load_state_dict(state['scheduler'])
     else:
         logging.info("No previous training state to load")
         
@@ -167,7 +175,7 @@ if __name__ == '__main__':
             optim.step()
             warmup.step()
                 
-            pct_epoch = min(1.0, idx/epoch_length)
+            pct_epoch = min(1.0, (idx+1)/epoch_length)
             
             losses.append((epoch + pct_epoch, loss.item()))
         
@@ -177,6 +185,8 @@ if __name__ == '__main__':
                 vloss, vacc, v_conf = get_validation_loss()
                 validation_stats.append([epoch+pct_epoch, vloss, vacc, v_conf])
                 
+                scheduler.step(vloss)
+
                 get_performance_plots(losses, validation_stats).savefig(f'./performance_{TRAINING_FOLD:02}.png')
                 logging.info(f'Generated validation stats -- plot saved to "./performance_{TRAINING_FOLD:02}.png"')
                 last_validation = epoch + pct_epoch
@@ -197,6 +207,7 @@ if __name__ == '__main__':
             'model': model.state_dict(),
             'optim': optim.state_dict(),
             'warmup': warmup.state_dict(),
+            'scheduler': scheduler.state_dict()
         }
         with gzip.open(f'./checkpoints/model_{TRAINING_FOLD:02}_{epoch:03}.pkl.gz', 'wb') as f:
             T.save(state, f)
