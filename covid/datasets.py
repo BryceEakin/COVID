@@ -21,14 +21,14 @@ __ALL__ = [
 ]
 
 def collate_stitch_data(list_of_samples):
-    chem_graphs, chem_features, proteins, results = zip(*list_of_samples)
+    names, chem_graphs, chem_features, proteins, results = zip(*list_of_samples)
     
     chem_graphs = BatchMolGraph(chem_graphs)
     chem_features = T.stack(chem_features)
     proteins = create_protein_batch(proteins)
     results = T.stack(results)
     
-    return chem_graphs, chem_features, proteins, results
+    return names, chem_graphs, chem_features, proteins, results
     
 class StitchDataset(T.utils.data.Dataset):
     def __init__(self, base_folder):
@@ -74,7 +74,7 @@ class StitchDataset(T.utils.data.Dataset):
         
         targets = T.tensor(row[['activation', 'binding', 'catalysis', 'inhibition', 'reaction']].values.astype(float), dtype=T.float32)
         
-        return chem_graph, chem_features, protein, targets
+        return (row['item_id_a'], row['item_id_b']), chem_graph, chem_features, protein, targets
 
 
 class SyntheticNegativeDataset(T.utils.data.Dataset):
@@ -112,7 +112,7 @@ class SyntheticNegativeDataset(T.utils.data.Dataset):
         
         targets = T.tensor(row[['activation', 'binding', 'catalysis', 'inhibition', 'reaction']].values.astype(float), dtype=T.float32)
         
-        return chem_graph, chem_features, protein, targets
+        return (chem, prot), chem_graph, chem_features, protein, targets
 
 
 def create_dataloader(data, batch_size, sample_size=None, neg_rate=0.2, **dl_kwargs):

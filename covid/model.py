@@ -6,13 +6,18 @@ from .data import apply_to_protein_batch, ProteinBatchToPaddedBatch
 from .modules import create_resnet_block_1d, DownscaleConv1d, Squeeze
 
 import numpy as np
+import pandas as pd
 
 from .utils import is_notebook
+from .constants import MODE_NAMES
 
 if is_notebook():
     from tqdm.notebook import tqdm
 else:
     from tqdm import tqdm
+
+from collections import namedtuple
+ConfusionMatrix = namedtuple('ConfusionMatrix', ['tp', 'fp', 'fn', 'tn'])
 
 __all__ = [
     "CovidModel",
@@ -70,7 +75,7 @@ class RandomModel(nn.Module):
 
 
 def run_model(model, batch, device):
-    chem_graphs, chem_features, proteins, target = batch
+    _, chem_graphs, chem_features, proteins, target = batch
     
     chem_graphs = chem_graphs.to(device)
     chem_features = chem_features.to(device)
@@ -145,9 +150,11 @@ def calculate_average_loss_and_accuracy(model, dl, device):
     fp = np.zeros(5)
     fn = np.zeros(5)
     tn = np.zeros(5)
+
+    out_blocks = []
     
     for batch in tqdm(dl):
-        chem_graphs, chem_features, proteins, target = batch
+        pair_names, chem_graphs, chem_features, proteins, target = batch
         model.zero_grad()
         result, target, loss, weight = run_model(model, batch, device)
         
@@ -161,5 +168,17 @@ def calculate_average_loss_and_accuracy(model, dl, device):
         fp += (((result >= 0.5) * (1 - target)) * weight).sum(0).cpu().numpy()
         fn += (((result < 0.5) * target) * weight).sum(0).cpu().numpy()
         tn += (((result < 0.5) * (1 - target)) * weight).sum(0).cpu().numpy()
+
+        name_blk = pd.DataFrame(pair_names, columns=['chem', 'protein'])
+        target_blk = pd.DataFrame(target.detach().cpu().numpy(), columns=MODE_NAMES)
+        result_blk = pd.DataFrame(result.detach().cpu().numpy(), columns=['pred_'+n for n in MODE_NAMES])
+
+        out_blocks.append(pd.concat([name_blk, target_blk, result_blk], axis=1))
         
-    return total_loss / total_div, accuracy_acc / accuracy_div, (tp,fp,fn,tn)
+        
+    return (
+        total_loss / total_div, 
+        accuracy_acc / accuracy_div, 
+        ConfusionMatrix(tp,fp,fn,tn), 
+        pd.concat(out_blocks, axis=0).reset_index(drop=True)
+    )

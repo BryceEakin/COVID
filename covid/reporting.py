@@ -53,10 +53,11 @@ def get_performance_plots(losses, validation_stats, period=None):
         plot_loss(axes[0,0], loss_x, loss_y, valid_x, valid_y, period)
         axes[0,0].set_ylabel('Loss')
         
-        tp, fp, tn, fn = zip(*valid_conf)
-        tp, fp, tn, fn = np.stack(tp), np.stack(fp), np.stack(tn), np.stack(fn)
+        tp, fp, fn, tn = zip(*valid_conf)
+        tp, fp, fn, tn = np.stack(tp), np.stack(fp), np.stack(fn), np.stack(tn)
 
-        accuracy = np.stack(valid_acc)
+        #accuracy = np.stack(valid_acc)
+        accuracy = (tp + tn) / (tp + tn + fp + fn)
         plot_stat(axes[0,1], valid_x, accuracy, 'Accuracy')
         
         precision = tp/np.maximum(tp+fp, 1e-5)
