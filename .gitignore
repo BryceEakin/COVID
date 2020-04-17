@@ -127,7 +127,12 @@ dmypy.json
 
 # raw data files
 raw_data/
+
+# Most outputs
 data/**/*
 checkpoints/*
-training_state*
-logs/
+training_state/*
+logs/*
+training_state/*
+*.csv.gz
+outputs/*.csv.gz

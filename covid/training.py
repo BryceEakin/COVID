@@ -11,11 +11,10 @@ import torch as T
 import gzip
 
 from .datasets import StitchDataset, create_data_split, create_dataloader
-from .model import (CovidModel, calculate_average_loss_and_accuracy,
-                    create_protein_model, run_model)
+from .model import (CovidModel, create_protein_model, run_model)
 from .modules.chemistry import MPNEncoder
 from .schedulers import LinearWarmupScheduler
-from .reporting import get_performance_plots
+from .reporting import get_performance_plots, calculate_average_loss_and_accuracy
 from .utils import is_notebook
 
 if is_notebook():
@@ -69,13 +68,14 @@ class CovidTrainingConfiguration():
     dataloader_num_workers: int = 1
 
     # Optimizer Configuration
-    optim_initial_lr: float = 1e-4
-    optim_adam_betas: typ.Tuple[int, int] = (0.95, 0.995)
+    optim_initial_lr: float = 1e-3
+    optim_adam_betas: typ.Tuple[int, int] = (0.9, 0.999)
+    optim_adam_eps: float = 0.01
     optim_warmup_override: typ.Union[None, int] = None # Applies 2/(1-Beta2) by default
 
     # LR Scheduler Configuration
     optim_scheduler_factor: float = 0.1**0.125
-    optim_scheduler_patience: int = 1
+    optim_scheduler_patience: int = 4
     optim_minimum_lr: float = 1e-7
 
     # Model hyperparameters
@@ -119,7 +119,12 @@ def _create_model(config):
 def _create_optimizer_and_schedulers(model, config):
     logging.info("Initializing optimizers/schedulers")
 
-    optim = T.optim.Adam(model.parameters(), lr=config.optim_initial_lr, betas=config.optim_adam_betas)
+    optim = T.optim.Adam(
+        model.parameters(), 
+        lr=config.optim_initial_lr, 
+        betas=config.optim_adam_betas,
+        eps=config.optim_adam_eps
+    )
 
     warmup = LinearWarmupScheduler(
         optim, 
@@ -247,9 +252,9 @@ def train_model(config:CovidTrainingConfiguration,
     for epoch in tqdm(range(epoch, 100)):
         logging.info(f"Beginning epoch {epoch}")
         
-        model.train()
         pct_epoch = 0
-        
+        model.train()
+
         for idx, batch in enumerate(tqdm(dataloader, leave=False)):
 
             model.zero_grad()
@@ -268,6 +273,7 @@ def train_model(config:CovidTrainingConfiguration,
                 logging.info("Generating validation stats")
 
                 vloss, vacc, v_conf, v_output = get_validation_loss()
+                model.train()
                 v_outputs.to_csv(f"./outputs/{run_name}_epoch{epoch:02}_validation_result.csv.gz", index=False)
 
                 validation_stats.append([epoch+pct_epoch, vloss, vacc, v_conf])
@@ -288,23 +294,24 @@ def train_model(config:CovidTrainingConfiguration,
         if interrupted:
             logging.info("user interrupt received -- quitting")
             break
-                
+
+        state = {
+            'epoch': epoch,
+            'losses': losses,
+            'validation_stats': validation_stats,
+            'last_validation': last_validation,
+            'model': model.state_dict(),
+            'optim': optim.state_dict(),
+            'warmup': warmup.state_dict(),
+            'scheduler': scheduler.state_dict()
+        }
+
         if not disable_checkpointing:
             logging.info('Saving checkpoint')
-            state = {
-                'epoch': epoch,
-                'losses': losses,
-                'validation_stats': validation_stats,
-                'last_validation': last_validation,
-                'model': model.state_dict(),
-                'optim': optim.state_dict(),
-                'warmup': warmup.state_dict(),
-                'scheduler': scheduler.state_dict()
-            }
             with gzip.open(f'./checkpoints/model_{run_name}_{epoch:03}.pkl.gz', 'wb') as f:
                 T.save(state, f)
             
-            logging.info('Saving state')
-            T.save(state, f"./training_state/{run_name}__state.pkl")
+        logging.info('Saving state')
+        T.save(state, f"./training_state/{run_name}__state.pkl")
     
     return losses, validation_stats

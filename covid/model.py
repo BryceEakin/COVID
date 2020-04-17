@@ -6,25 +6,12 @@ from .data import apply_to_protein_batch, ProteinBatchToPaddedBatch
 from .modules import create_resnet_block_1d, DownscaleConv1d, Squeeze
 
 import numpy as np
-import pandas as pd
-
-from .utils import is_notebook
-from .constants import MODE_NAMES
-
-if is_notebook():
-    from tqdm.notebook import tqdm
-else:
-    from tqdm import tqdm
-
-from collections import namedtuple
-ConfusionMatrix = namedtuple('ConfusionMatrix', ['tp', 'fp', 'fn', 'tn'])
 
 __all__ = [
     "CovidModel",
     "RandomModel",
     'create_protein_model',
     'run_model',
-    'calculate_average_loss_and_accuracy'
 ]
 
 class CovidModel(nn.Module):
@@ -83,7 +70,6 @@ def run_model(model, batch, device):
 
     weights = (target * 0.0015).clamp(1e-3, 1.0)
     weights[target == 0] = 0.5
-
     weights = weights.to(device)
     
     target = (1.0*(target > 0)).to(device)
@@ -135,50 +121,4 @@ def create_protein_model(dropout = 0.2, outdim=600):
         nn.Linear(1024,outdim),
         #nn.Tanhshrink(),
         #nn.Tanh(),
-    )
-
-def calculate_average_loss_and_accuracy(model, dl, device):
-    model.eval()
-    
-    total_loss = 0.0
-    total_div = 0
-    
-    accuracy_acc = np.zeros(5)
-    accuracy_div = np.zeros(5)
-    
-    tp = np.zeros(5)
-    fp = np.zeros(5)
-    fn = np.zeros(5)
-    tn = np.zeros(5)
-
-    out_blocks = []
-    
-    for batch in tqdm(dl):
-        pair_names, chem_graphs, chem_features, proteins, target = batch
-        model.zero_grad()
-        result, target, loss, weight = run_model(model, batch, device)
-        
-        total_loss += loss.item() * result.shape[0]
-        total_div += result.shape[0]
-        
-        accuracy_acc += (((result > 0.5) == target) * weight).sum(0).cpu().numpy()
-        accuracy_div += weight.sum(0).cpu().numpy()
-        
-        tp += (((result >= 0.5) * target) * weight).sum(0).cpu().numpy()
-        fp += (((result >= 0.5) * (1 - target)) * weight).sum(0).cpu().numpy()
-        fn += (((result < 0.5) * target) * weight).sum(0).cpu().numpy()
-        tn += (((result < 0.5) * (1 - target)) * weight).sum(0).cpu().numpy()
-
-        name_blk = pd.DataFrame(pair_names, columns=['chem', 'protein'])
-        target_blk = pd.DataFrame(target.detach().cpu().numpy(), columns=MODE_NAMES)
-        result_blk = pd.DataFrame(result.detach().cpu().numpy(), columns=['pred_'+n for n in MODE_NAMES])
-
-        out_blocks.append(pd.concat([name_blk, target_blk, result_blk], axis=1))
-        
-        
-    return (
-        total_loss / total_div, 
-        accuracy_acc / accuracy_div, 
-        ConfusionMatrix(tp,fp,fn,tn), 
-        pd.concat(out_blocks, axis=0).reset_index(drop=True)
     )
