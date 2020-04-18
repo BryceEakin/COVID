@@ -148,26 +148,26 @@ def create_data_split(src_folder, dst_train_folder, dst_test_folder, pct_train=0
     while True:
         is_selected = pd.Series(False, index=data.all_data.index)
 
-        chem_to_select = list(data.all_chemicals.keys())
-        random.shuffle(chem_to_select)
+        protein_to_select = list(data.all_proteins.keys())
+        random.shuffle(protein_to_select)
 
         have_selected = set()
         num_selected = 0
 
-        while num_selected/is_selected.shape[0] < (1-pct_train) and len(chem_to_select) > 0:
-            chem = chem_to_select.pop(0)
-            items_to_select = [chem]
+        while num_selected/is_selected.shape[0] < (1-pct_train) and len(protein_to_select) > 0:
+            prot = protein_to_select.pop(0)
+            items_to_select = [prot]
             while items_to_select:
                 item = items_to_select.pop(0)
                 
                 have_selected.add(item)
                 new_selections = (
-                    (data.all_data['item_id_a'] == item)
+                    (data.all_data['item_id_b'] == item)
                     #| (data.all_data['item_id_b'] == item)
                 )
                 new_data = data.all_data.loc[new_selections]
                 items_to_select.extend(
-                    set(new_data['item_id_a'].values).union(
+                    set(new_data['item_id_b'].values).union(
                         set() #new_data['item_id_b'].values
                     ).difference(have_selected)
                 )

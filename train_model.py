@@ -2,6 +2,7 @@ from covid.training import train_model, CovidTrainingConfiguration
 from covid.utils import getch
 
 import threading
+import os
 
 if __name__ == '__main__':
     
@@ -11,6 +12,9 @@ if __name__ == '__main__':
         return interrupted
     
     config = CovidTrainingConfiguration()
+
+    if os.path.exists('/mnt/covidprojstorage/data'):
+        config.root_folder = '/mnt/covidprojstorage'
 
     run_thread = threading.Thread(
         target=train_model, 

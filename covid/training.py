@@ -53,6 +53,7 @@ def initialize_logger(run_name,
 @dataclass
 class CovidTrainingConfiguration():
     # Global config
+    root_folder: str = '.'
     random_seed: int = 4
     batch_size: int = 24
     training_fold: typ.Union[int, None] = 0
@@ -97,14 +98,22 @@ def _set_random_seeds(seed = 4):
     T.manual_seed(seed)
 
 
-def _create_all_data_splits():
+def _create_all_data_splits(root):
     _set_random_seeds(4) # Always split data with consistent random seed
     logging.debug("Creating data splits -- global training/holdout")
-    create_data_split('./data', './data/training', './data/final_holdout')
+    create_data_split(
+        os.path.join(root, 'data'), 
+        os.path.join(root, 'data/training'), 
+        os.path.join(root, 'data/final_holdout')
+    )
     
     for i in range(10):
         logging.debug(f"Creating data splits -- train/validation {i:02}")
-        create_data_split('./data/training', f'./data/train_{i:02}', f'./data/valid_{i:02}')
+        create_data_split(
+            os.path.join(root, 'data/training'),
+            os.path.join(root, f'data/train_{i:02}'), 
+            os.path.join(root, f'./data/valid_{i:02}')
+        )
 
 
 def _create_model(config):
@@ -158,7 +167,7 @@ def _create_optimizer_and_schedulers(model, config):
 
 def _create_dataloaders(config):
     logging.debug("Initializing Datasets")
-    data = StitchDataset(f'./data/train_{config.training_fold:02}')
+    data = StitchDataset(os.path.join(config.root_folder, f'data/train_{config.training_fold:02}'))
     dataloader = create_dataloader(
         data, 
         config.batch_size, 
@@ -167,7 +176,7 @@ def _create_dataloaders(config):
         num_workers = config.dataloader_num_workers
     )
 
-    validation_data = StitchDataset(f'./data/valid_{config.training_fold:02}')
+    validation_data = StitchDataset(os.path.join(config.root_folder, f'data/valid_{config.training_fold:02}'))
     validation_dataloader = create_dataloader(
         validation_data, 
         config.batch_size, 
@@ -195,12 +204,12 @@ def train_model(config:CovidTrainingConfiguration,
     if config.training_fold is None:
         logging.warning("Note: You are training this model on the full training data!")
 
-    if not os.path.exists('./data/training'):
+    if not os.path.exists(os.path.join(config.root_folder, 'data/training')):
         # Create data splits if they haven't been computed
         if config.training_fold is not None and config.training_fold != 0:
             raise Exception("Cannot generate trait/test splits with non-zero training fold specified")
 
-        _create_all_data_splits()
+        _create_all_data_splits(config.root_folder)
 
     # Set random seeds for reproducibility
     _set_random_seeds(config.random_seed)
@@ -217,7 +226,7 @@ def train_model(config:CovidTrainingConfiguration,
     # Create the optimizer & schedulers
     optim, warmup, scheduler = _create_optimizer_and_schedulers(model, config)
 
-    training_state_path = f"./training_state/{run_name}__state.pkl"
+    training_state_path = os.path.join(config.root_folder, f"training_state/{run_name}__state.pkl")
     
     losses = []
     validation_stats = []
@@ -255,11 +264,14 @@ def train_model(config:CovidTrainingConfiguration,
     # make required subfolders
     for folder in ['outputs', 'models', 'checkpoints', 'training_state']:
         if not os.path.exists(folder):
-            os.mkdir("./" + folder)
+            os.mkdir(os.path.join(config.root_folder, folder))
 
     if epoch == 0:
         vloss, vacc, v_conf, v_outputs = get_validation_loss()
-        v_outputs.to_csv(f"./outputs/{run_name}_epoch00_validation_result.csv.gz", index=False)
+        v_outputs.to_csv(os.path.join(
+            config.root_folder, 
+            f"outputs/{run_name}_epoch00_validation_result.csv.gz"
+        ), index=False)
         validation_stats.append([0, vloss, vacc, v_conf])
 
     epoch_length = len(dataloader)
@@ -290,14 +302,17 @@ def train_model(config:CovidTrainingConfiguration,
 
                 vloss, vacc, v_conf, v_output = get_validation_loss()
                 model.train()
-                v_outputs.to_csv(f"./outputs/{run_name}_epoch{epoch:02}_validation_result.csv.gz", index=False)
+                v_outputs.to_csv(os.path.join(
+                    config.root_folder, 
+                    f"outputs/{run_name}_epoch{epoch:02}_validation_result.csv.gz"
+                ), index=False)
 
                 validation_stats.append([epoch+pct_epoch, vloss, vacc, v_conf])
                 
                 scheduler.step(vloss)
 
                 fig = get_performance_plots(losses, validation_stats)
-                fig_path = f'./outputs/performance_{run_name}.png'
+                fig_path = os.path.join(config.root_folder, f'outputs/{run_name}_performance.png')
                 fig.savefig(fig_path)
                 plt.close(fig)
                 logging.info(f'Generated validation stats -- plot saved to "{fig_path}"')
