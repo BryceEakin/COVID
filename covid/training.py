@@ -35,7 +35,7 @@ def initialize_logger(run_name,
     # create console handler and set level to info
     handler = logging.StreamHandler()
     handler.setLevel(print_lvl)
-    formatter = logging.Formatter("[%(levelname)s] %(message)s")
+    formatter = logging.Formatter(f"{run_name} | [%(levelname)s] %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
@@ -58,8 +58,7 @@ class CovidTrainingConfiguration():
     training_fold: typ.Union[int, None] = 0
     max_epochs: int = 100
     validation_frequency: float = 0.2
-
-    create_checkpoints: bool = True
+    verbosity: int = logging.INFO
 
     device: str = 'cuda'
 
@@ -81,14 +80,18 @@ class CovidTrainingConfiguration():
     # Model hyperparameters
     chem_layers_per_message: int = 2
     chem_hidden_size: int = 300
+    chem_nonlinearity: str = 'ReLU'
+
+    protein_base_dim: int = 64
+    protein_output_dim: int = 600
+    protein_nonlinearity: str = 'silu'
+    protein_downscale_nonlinearity: str = 'tanh'
 
     dropout_rate: float = 0.4
-
-    init_normal: bool = True
-
+    
 
 def _set_random_seeds(seed = 4):
-    logging.info(f"Random seeds set: {seed}")
+    logging.debug(f"Random seeds set: {seed}")
     np.random.seed(seed)
     random.seed(seed)
     T.manual_seed(seed)
@@ -96,28 +99,41 @@ def _set_random_seeds(seed = 4):
 
 def _create_all_data_splits():
     _set_random_seeds(4) # Always split data with consistent random seed
-    logging.info("Creating data splits -- global training/holdout")
+    logging.debug("Creating data splits -- global training/holdout")
     create_data_split('./data', './data/training', './data/final_holdout')
     
     for i in range(10):
-        logging.info(f"Creating data splits -- train/validation {i:02}")
+        logging.debug(f"Creating data splits -- train/validation {i:02}")
         create_data_split('./data/training', f'./data/train_{i:02}', f'./data/valid_{i:02}')
 
 
 def _create_model(config):
-    logging.info("Creating model")
+    logging.debug("Creating model")
     chem_model = MPNEncoder(
         layers_per_message=config.chem_layers_per_message, 
         hidden_size=config.chem_hidden_size,
+        dropout=config.dropout_rate,
+        activation=config.chem_nonlinearity
+    )
+    protein_model = create_protein_model(
+        dropout=config.dropout_rate,
+        outdim = config.protein_output_dim,
+        base_dim = config.protein_base_dim,
+        nonlinearity = config.protein_nonlinearity,
+        downscale_nonlinearity = config.protein_downscale_nonlinearity
+
+    )
+    model = CovidModel(
+        chem_model, 
+        protein_model, 
+        in_dim=config.chem_hidden_size + config.protein_output_dim,
         dropout=config.dropout_rate
     )
-    protein_model = create_protein_model(dropout=config.dropout_rate)
-    model = CovidModel(chem_model, protein_model, dropout=config.dropout_rate)
     return model
 
 
 def _create_optimizer_and_schedulers(model, config):
-    logging.info("Initializing optimizers/schedulers")
+    logging.debug("Initializing optimizers/schedulers")
 
     optim = T.optim.Adam(
         model.parameters(), 
@@ -141,7 +157,7 @@ def _create_optimizer_and_schedulers(model, config):
 
 
 def _create_dataloaders(config):
-    logging.info("Initializing Datasets")
+    logging.debug("Initializing Datasets")
     data = StitchDataset(f'./data/train_{config.training_fold:02}')
     dataloader = create_dataloader(
         data, 
@@ -172,7 +188,7 @@ def train_model(config:CovidTrainingConfiguration,
     if run_name is None:
         run_name = f"train_fold{config.training_fold:02}" if config.training_fold is not None else "train_global"
 
-    initialize_logger(run_name)
+    initialize_logger(run_name, print_lvl=config.verbosity)
 
     logging.info(f"Training initializing -- {run_name}")
     
@@ -192,7 +208,7 @@ def train_model(config:CovidTrainingConfiguration,
     # Create and initialize model
     model = _create_model(config)
     
-    logging.info("Pushing model to device")
+    logging.debug("Pushing model to device")
     model.to(config.device)
 
     # Create dataloaders
@@ -249,7 +265,7 @@ def train_model(config:CovidTrainingConfiguration,
     epoch_length = len(dataloader)
     interrupted = False
 
-    for epoch in tqdm(range(epoch, 100)):
+    for epoch in tqdm(range(epoch, config.max_epochs)):
         logging.info(f"Beginning epoch {epoch}")
         
         pct_epoch = 0

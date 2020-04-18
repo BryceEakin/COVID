@@ -7,7 +7,14 @@ class SiLU(nn.Module):
     def forward(self, x):
         return silu(x)
 
-NONLINEARITIES = {'relu': nn.ReLU, 'silu': SiLU, 'sigmoid': nn.Sigmoid, 'tanh': nn.Tanh}
+NONLINEARITIES = {
+    'relu': nn.ReLU, 
+    'silu': SiLU, 
+    'sigmoid': nn.Sigmoid, 
+    'tanh': nn.Tanh,
+    'leaky_relu': nn.LeakyReLU,
+    'elu': nn.ELU
+}
 
 class Squeeze(nn.Module):
     def __init__(self, axis):

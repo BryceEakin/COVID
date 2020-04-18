@@ -6,6 +6,7 @@ from .data import apply_to_protein_batch, ProteinBatchToPaddedBatch
 from .modules import create_resnet_block_1d, DownscaleConv1d, Squeeze
 
 import numpy as np
+import functools
 
 __all__ = [
     "CovidModel",
@@ -80,34 +81,53 @@ def run_model(model, batch, device):
     return result, target, loss, weights
 
 
-def create_protein_model(dropout = 0.2, outdim=600):
+def create_protein_model(dropout = 0.2, 
+                         outdim=600, 
+                         base_dim=64,
+                         nonlinearity='silu',
+                         downscale_nonlinearity='tanh',
+                         maxpool=True
+                        ):
+
+    resnet = functools.partial(create_resnet_block_1d, for_protein_batch=True, nonlinearity=nonlinearity)
+
     return nn.Sequential(
         # 21->100 channels inplace convolution
-        apply_to_protein_batch(nn.Conv1d(23, 512, (1, ), 1, 0)),
+        apply_to_protein_batch(nn.Conv1d(23, base_dim * 4, (1, ), 1, 0)),
         apply_to_protein_batch(nn.Dropout(dropout)),
         
         #Do some resnet
-        create_resnet_block_1d(512, 64, inner_kernel=3, for_protein_batch=True),
-        create_resnet_block_1d(512, 64, inner_kernel=5, for_protein_batch=True),
+        resnet(base_dim * 4, base_dim, inner_kernel=3),
+        resnet(base_dim * 4, base_dim, inner_kernel=5),
         apply_to_protein_batch(nn.Dropout(dropout)),
 
-        create_resnet_block_1d(512, 64, inner_kernel=7, for_protein_batch=True),
-        create_resnet_block_1d(512, 64, inner_kernel=11, for_protein_batch=True),
+        resnet(base_dim * 4, base_dim, inner_kernel=7),
+        resnet(base_dim * 4, base_dim, inner_kernel=11),
         
         # Scale it down
-        DownscaleConv1d(512, 512, 4, maxpool=True, for_protein_batch=True),
+        DownscaleConv1d(base_dim * 4, 
+                        base_dim * 8, 
+                        4, 
+                        maxpool=True, 
+                        for_protein_batch=True, 
+                        nonlinearity=downscale_nonlinearity),
         apply_to_protein_batch(nn.Dropout(dropout)),
         
         #Do some resnet
-        create_resnet_block_1d(512, 128, inner_kernel=3, for_protein_batch=True),
-        create_resnet_block_1d(512, 128, inner_kernel=5, for_protein_batch=True),
+        resnet(base_dim * 8, base_dim * 2, inner_kernel=3),
+        resnet(base_dim * 8, base_dim * 2, inner_kernel=5),
         
         # Scale it down again
-        DownscaleConv1d(512, 1024,4,'silu', maxpool=True, for_protein_batch=True),
+        DownscaleConv1d(base_dim * 8, 
+                        base_dim * 16,
+                        4,
+                        maxpool=True, 
+                        for_protein_batch=True,
+                        nonlinearity=downscale_nonlinearity),
         
         # Final resneting
-        create_resnet_block_1d(1024, 256, inner_kernel=7, for_protein_batch=True),
-        create_resnet_block_1d(1024, 256, inner_kernel=3, for_protein_batch=True),
+        resnet(base_dim * 16, base_dim * 4, inner_kernel=7),
+        resnet(base_dim * 16, base_dim * 4, inner_kernel=3),
         
         apply_to_protein_batch(nn.MaxPool1d(100000, ceil_mode=True)),
         
@@ -116,9 +136,9 @@ def create_protein_model(dropout = 0.2, outdim=600):
         
         Squeeze(-1),
         nn.Dropout(dropout),
-        nn.Linear(1024, 1024),
+        nn.Linear(base_dim * 16, base_dim * 16),
         nn.ReLU(),
-        nn.Linear(1024,outdim),
+        nn.Linear(base_dim * 16, outdim),
         #nn.Tanhshrink(),
         #nn.Tanh(),
     )

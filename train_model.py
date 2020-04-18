@@ -17,7 +17,7 @@ if __name__ == '__main__':
         args=[config], 
         kwargs={
             'check_interrupted':check_interrupted,
-            'disable_checkpointing':True
+            #'disable_checkpointing':True
         }
     )
     run_thread.start()
@@ -32,6 +32,3 @@ if __name__ == '__main__':
     
     print("Trying to quit....")
     run_thread.join()
-    
-
-    
