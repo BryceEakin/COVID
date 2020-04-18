@@ -263,7 +263,7 @@ def train_model(config:CovidTrainingConfiguration,
 
     # make required subfolders
     for folder in ['outputs', 'models', 'checkpoints', 'training_state']:
-        if not os.path.exists(folder):
+        if not os.path.exists(os.path.join(config.root_folder, folder)):
             os.mkdir(os.path.join(config.root_folder, folder))
 
     if epoch == 0:
