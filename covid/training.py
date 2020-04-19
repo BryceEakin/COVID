@@ -243,10 +243,18 @@ def train_model(config:CovidTrainingConfiguration,
     validation_stats = []
     last_validation = 0
 
+    state = None
+
     if os.path.exists(training_state_path) and not disable_training_resume:
         logging.info("Loading previous training state")
         state = T.load(training_state_path, map_location=config.device)
-            
+
+    elif os.path.exists(training_state_path + '.gz') and not disable_training_resume:
+        logging.info("Loading previous training state")
+        with gzip.open(training_state_path + '.gz', 'rb') as f:
+            state = T.load(f, map_location=config.device)
+
+    if state is not None:
         epoch = state.get('epoch', epoch-1) + 1
         losses = state.get('losses', losses)
         validation_stats = state.get('validation_stats', validation_stats)
@@ -339,10 +347,11 @@ def train_model(config:CovidTrainingConfiguration,
 
         if not disable_checkpointing:
             logging.info('Saving checkpoint')
-            with gzip.open(f'./checkpoints/model_{run_name}_{epoch:03}.pkl.gz', 'wb') as f:
+            with gzip.open(os.path.join(config.root_folder, f'checkpoints/model_{run_name}_{epoch:03}.pkl.gz'), 'wb') as f:
                 T.save(state, f)
             
         logging.info('Saving state')
-        T.save(state, f"./training_state/{run_name}__state.pkl")
+        with gzip.open(training_state_path + ".gz", 'wb') as f:
+            T.save(state, f)
     
     return losses, validation_stats

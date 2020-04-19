@@ -115,10 +115,10 @@ def test_parameterization(params, check_interrupted=None):
         'runtime': runtime,
         'status': status,
         'label': label,
-        'attachments':{
-            'training_loss_hist': pkl.dumps(losses),
-            'validation_stats': pkl.dumps(validation_stats)
-        }
+        #'attachments':{
+        #    'training_loss_hist': pkl.dumps(losses),
+        #    'validation_stats': pkl.dumps(validation_stats)
+        #}
     }
     return result
 

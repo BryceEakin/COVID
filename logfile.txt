@@ -1,0 +1,39 @@
+INFO (root): Training initializing -- hyperopt_a30d2da9a248
+INFO (root): Resuming from previous training state manually disabled
+INFO (root): Beginning epoch 0
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Saving state
+INFO (root): Beginning epoch 1
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Saving state
+INFO (root): Beginning epoch 2
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
+INFO (root): Saving state
+INFO (hyperopt.mongoexp): job exception: 'Attachments' object has no attribute 'handle'
