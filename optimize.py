@@ -108,7 +108,7 @@ def test_parameterization(params, check_interrupted=None):
     
     v_x, vloss, _, _ = zip(*validation_stats)
 
-    slope, intercept, _, _, _ = linregress(v_x[-5:], vloss[-5:])
+    slope, intercept, _, _, _ = linregress(v_x[-3:], vloss[-3:])
 
     result = {
         'loss': intercept + slope * (v_x[-1] + 1),
