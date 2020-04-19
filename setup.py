@@ -8,7 +8,7 @@ setup(
     version='0.0.1',
     author='Bryce Eakin',
     author_email='bryce.eakin@gmail.com',
-    description='some text',
+    description='',
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/BryceEakin/COVID',
