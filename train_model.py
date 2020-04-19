@@ -13,9 +13,6 @@ if __name__ == '__main__':
     
     config = CovidTrainingConfiguration()
 
-    if os.path.exists('/mnt/covidprojstorage/data'):
-        config.root_folder = '/mnt/covidprojstorage'
-
     run_thread = threading.Thread(
         target=train_model, 
         args=[config], 
