@@ -4,6 +4,8 @@ from covid.utils import getch
 import threading
 import os
 
+import logging
+
 if __name__ == '__main__':
     
     interrupted = False
@@ -12,6 +14,7 @@ if __name__ == '__main__':
         return interrupted
     
     config = CovidTrainingConfiguration()
+    config.verbosity = logging.DEBUG
 
     if os.name == 'nt':
         run_thread = threading.Thread(

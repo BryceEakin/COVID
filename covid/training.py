@@ -100,7 +100,7 @@ def _set_random_seeds(seed = 4):
 
 def _create_all_data_splits(root):
     _set_random_seeds(4) # Always split data with consistent random seed
-    logging.debug("Creating data splits -- global training/holdout")
+    logging.info("Creating data splits -- global training/holdout")
     create_data_split(
         os.path.join(root, 'data'), 
         os.path.join(root, 'data/training'), 
@@ -108,11 +108,11 @@ def _create_all_data_splits(root):
     )
     
     for i in range(10):
-        logging.debug(f"Creating data splits -- train/validation {i:02}")
+        logging.info(f"Creating data splits -- train/validation {i:02}")
         create_data_split(
             os.path.join(root, 'data/training'),
             os.path.join(root, f'data/train_{i:02}'), 
-            os.path.join(root, f'./data/valid_{i:02}')
+            os.path.join(root, f'data/valid_{i:02}')
         )
 
 

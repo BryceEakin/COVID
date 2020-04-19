@@ -6,6 +6,7 @@ from datetime import datetime
 
 import hyperopt
 from hyperopt import hp
+from hyperopt.mongoexp import MongoTrials
 
 from covid.training import CovidTrainingConfiguration, train_model
 from covid.utils import getch
@@ -143,24 +144,17 @@ def run_optimization():
             ['relu', 'silu', 'tanh', 'leaky_relu', 'elu']),
     }
 
-    if os.path.exists("./hyperopt_trials.pkl"):
-        with open("./hyperopt_trials.pkl", "rb") as f:
-            trials = pkl.load(f)
-    else:
-        trials = hyperopt.Trials()
-
+    trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key='covid-1')
     
     best = hyperopt.fmin(
         objective,
         space=search_space,
         algo=hyperopt.tpe.suggest,
-        max_evals=10,
+        max_evals=100,
         trials=trials
     )
 
     print(best)
-    with open("./hyperopt_trials.pkl", "wb") as f:
-        pkl.dump(trials, f, pkl.HIGHEST_PROTOCOL)
 
 if __name__ == '__main__':
     
