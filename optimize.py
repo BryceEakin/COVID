@@ -111,7 +111,7 @@ def test_parameterization(params, check_interrupted=None):
     slope, intercept, _, _, _ = linregress(v_x[-3:], vloss[-3:])
 
     result = {
-        'loss': intercept + slope * (v_x[-1] + 1),
+        'loss': intercept + slope * (v_x[-1] + 0.5),
         'runtime': runtime.total_seconds(),
         'status': status,
         'label': label,
