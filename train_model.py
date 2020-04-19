@@ -13,23 +13,26 @@ if __name__ == '__main__':
     
     config = CovidTrainingConfiguration()
 
-    run_thread = threading.Thread(
-        target=train_model, 
-        args=[config], 
-        kwargs={
-            'check_interrupted':check_interrupted,
-            #'disable_checkpointing':True
-        }
-    )
-    run_thread.start()
+    if os.name == 'nt':
+        run_thread = threading.Thread(
+            target=train_model, 
+            args=[config], 
+            kwargs={
+                'check_interrupted':check_interrupted,
+                #'disable_checkpointing':True
+            }
+        )
+        run_thread.start()
 
-    print("Press 'q' or 'ctrl+c' to interrupt training loop")
+        print("Press 'q' or 'ctrl+c' to interrupt training loop")
+            
+        while True:
+            ch = getch()
+            if ch in (b'q', 'q', b'\x03', '\x03'):
+                interrupted = True
+                break
         
-    while True:
-        ch = getch()
-        if ch in (b'q', 'q', b'\x03', '\x03'):
-            interrupted = True
-            break
-    
-    print("Trying to quit....")
-    run_thread.join()
+        print("Trying to quit....")
+        run_thread.join()
+    else:
+        train_model(config)
