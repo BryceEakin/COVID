@@ -112,7 +112,7 @@ def test_parameterization(params, check_interrupted=None):
 
     result = {
         'loss': intercept + slope * (v_x[-1] + 1),
-        'runtime': runtime,
+        'runtime': runtime.total_seconds(),
         'status': status,
         'label': label,
         #'attachments':{

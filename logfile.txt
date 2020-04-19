@@ -37,3 +37,12 @@ INFO (root): Generating validation stats
 INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_a30d2da9a248_performance.png"
 INFO (root): Saving state
 INFO (hyperopt.mongoexp): job exception: 'Attachments' object has no attribute 'handle'
+INFO (root): Training initializing -- hyperopt_bbd262926059
+INFO (root): Resuming from previous training state manually disabled
+INFO (root): Beginning epoch 0
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_bbd262926059_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_bbd262926059_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_bbd262926059_performance.png"
