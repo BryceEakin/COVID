@@ -136,6 +136,7 @@ data/**/*
 checkpoints/*
 training_state/*
 logs/*
+logfile.txt
 training_state/*
 *.csv.gz
 outputs/*.csv.gz

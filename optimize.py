@@ -72,7 +72,7 @@ def test_parameterization(params, check_interrupted=None):
 
     label = 'hyperopt_' + hsh.hexdigest()[:12]
 
-    config.max_epochs = 3
+    config.max_epochs = 1
     config.batch_size = 24
 
     config.optim_adam_betas = (params['adam_beta1'], params['adam_beta2'])
@@ -94,7 +94,7 @@ def test_parameterization(params, check_interrupted=None):
     losses, validation_stats = train_model(
         config, 
         run_name=label,
-        disable_training_resume=True, 
+        disable_training_resume=False, 
         check_interrupted=check_interrupted, 
         disable_checkpointing=True
     )

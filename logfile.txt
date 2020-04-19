@@ -46,3 +46,54 @@ INFO (root): Generating validation stats
 INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_bbd262926059_performance.png"
 INFO (root): Generating validation stats
 INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_bbd262926059_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_bbd262926059_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_bbd262926059_performance.png"
+INFO (root): Saving state
+INFO (root): Beginning epoch 1
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_bbd262926059_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_bbd262926059_performance.png"
+INFO (hyperopt.mongoexp): job exception: DataLoader worker (pid(s) 30168) exited unexpectedly
+INFO (root): Training initializing -- hyperopt_9def6925ad67
+INFO (root): Resuming from previous training state manually disabled
+INFO (root): Beginning epoch 0
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Saving state
+INFO (root): Beginning epoch 1
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Saving state
+INFO (root): Beginning epoch 2
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9def6925ad67_performance.png"
+INFO (root): Saving state
+INFO (hyperopt.mongoexp): job exception: ('SONify', datetime.timedelta(seconds=11556, microseconds=913381), {'loss': 0.2085860491709038, 'runtime': datetime.timedelta(seconds=11556, microseconds=913381), 'status': 'ok', 'label': 'hyperopt_9def6925ad67'})
+INFO (root): Training initializing -- hyperopt_101cf160a82e
