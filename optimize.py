@@ -93,6 +93,7 @@ def test_parameterization(params, check_interrupted=None):
 
     losses, validation_stats = train_model(
         config, 
+        label,
         disable_training_resume = True, 
         check_interrupted=check_interrupted, 
         disable_checkpointing=True
@@ -114,8 +115,10 @@ def test_parameterization(params, check_interrupted=None):
         'runtime': runtime,
         'status': status,
         'label': label,
-        'training_loss_hist': losses,
-        'validation_stats': make_json_friendly(validation_stats)
+        'attachments':{
+            'training_loss_hist': pkl.dumps(losses),
+            'validation_stats': pkl.dumps(validation_stats)
+        }
     }
     return result
 
