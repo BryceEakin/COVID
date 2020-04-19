@@ -93,8 +93,8 @@ def test_parameterization(params, check_interrupted=None):
 
     losses, validation_stats = train_model(
         config, 
-        label,
-        disable_training_resume = True, 
+        run_name=label,
+        disable_training_resume=True, 
         check_interrupted=check_interrupted, 
         disable_checkpointing=True
     )
