@@ -185,6 +185,8 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         cpy['exp_key'] = new_exp_key
         cpy['tid'] = tid
         cpy['misc']['tid'] = tid
+        del cpy['_id']
+        
         dest_trials.insert_trial_doc(cpy)
 
     new_specs = []
