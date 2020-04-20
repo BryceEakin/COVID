@@ -257,8 +257,13 @@ def train_model(config:CovidTrainingConfiguration,
 
     elif os.path.exists(training_state_path + '.gz') and not disable_training_resume:
         logging.info("Loading previous training state")
-        with gzip.open(training_state_path + '.gz', 'rb') as f:
-            state = T.load(f, map_location=config.device)
+        try:
+            with gzip.open(training_state_path + '.gz', 'rb') as f:
+                state = T.load(f, map_location=config.device)
+        except:
+            state = None
+            logging.info("Previous state corrupt -- training from scratch")
+            os.remove(training_state_path)
 
     if state is not None:
         epoch = state.get('epoch', epoch-1) + 1

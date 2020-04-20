@@ -19,6 +19,7 @@ import numpy as np
 from datetime import timedelta
 import copy
 import requests
+import shutil
 
 from collections import Mapping, Iterable
 
@@ -110,9 +111,13 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
     r = requests.get(f'http://localhost:5535/training-state/{label}', stream=True)
 
     if r.status_code == 200:
-        with open(training_state_path, "wb") as f:
+        with open(training_state_path + ".tmp", "wb") as f:
             for chunk in r.iter_content(chunk_size=1024):
                 f.write(chunk)
+
+        if os.path.exists(training_state_path):
+            os.remove(training_state_path)
+        shutil.move(training_state_path + ".tmp", training_state_path)
 
     losses, validation_stats = train_model(
         config, 

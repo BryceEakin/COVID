@@ -6,6 +6,7 @@ import sys, os
 from hyperopt.mongoexp import MongoTrials
 from datetime import datetime
 import logging
+import shutil
 
 PORT = 5535
 
@@ -24,12 +25,16 @@ async def get_training_state(request, run_id):
 
 @app.put("/training-state/<run_id>", stream=True)
 async def put_training_state(request, run_id):
-    with open(f"./training_state/{run_id}__state.pkl.gz", "wb") as f:
+    with open(f"./training_state/{run_id}__state.pkl.gz.tmp", "wb") as f:
         while True:
             chunk = await request.stream.read()
             if chunk is None:
                 break
             f.write(chunk)
+
+    if os.path.exists(f"./training_state/{run_id}__state.pkl.gz"):
+        os.remove(f"./training_state/{run_id}__state.pkl.gz.tmp")
+    shutil.move(f"./training_state/{run_id}__state.pkl.gz.tmp", f"./training_state/{run_id}__state.pkl.gz")
     return text("Model State Uploaded")
 
 
