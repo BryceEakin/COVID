@@ -196,12 +196,14 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         del misc['tid']
         new_miscs.append(misc)
 
-    dest_trials.new_trial_docs(new_tids, new_specs, new_results, new_miscs)
+    dest_trials.insert_trial_doc(
+        dest_trials.new_trial_docs(new_tids, new_specs, new_results, new_miscs)
+    )
 
     for idx in ordered_idxs[num_suggestions:]:
         if src_trials.losses()[idx] is None:
             continue
-        
+
         if len(available_tids) == 0:
             available_tids = dest_trials.new_trial_ids(last_tid)
         
@@ -216,6 +218,13 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         del cpy['_id']
 
         dest_trials.insert_trial_doc(cpy)
+
+
+# def create_suggestion_box(trials_to_use):
+#     def suggest_with_tpe_fallback(new_ids, domain, trails, seed):
+#         nonlocal trials_to_use
+
+#     return trials.new_trial_docs([])
         
 
 def run_optimization(level=1):
