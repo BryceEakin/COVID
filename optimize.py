@@ -173,22 +173,6 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
     last_tid = 0 if len(all_trials.tids) == 0 else max(all_trials.tids)
     available_tids = []
     
-    for idx in ordered_idxs[num_suggestions:]:
-        if len(available_tids) == 0:
-            available_tids = dest_trials.new_trial_ids(last_tid)
-        
-        tid = available_tids.pop(0)
-        last_tid = tid
-
-        # copy in the ones that aren't worth exploring further
-        cpy = copy.deepcopy(src_trials.trials[idx])
-        cpy['exp_key'] = new_exp_key
-        cpy['tid'] = tid
-        cpy['misc']['tid'] = tid
-        del cpy['_id']
-
-        dest_trials.insert_trial_doc(cpy)
-
     new_tids = []
     new_specs = []
     new_results = []
@@ -209,10 +193,29 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         new_results.append({'status': 'new'})
 
         misc = copy.deepcopy(src_trials.trials[idx]['misc'])
-        misc['tid'] = tid
+        del misc['tid']
         new_miscs.append(misc)
 
     dest_trials.new_trial_docs(new_tids, new_specs, new_results, new_miscs)
+
+    for idx in ordered_idxs[num_suggestions:]:
+        if src_trials.losses()[idx] is None:
+            continue
+        
+        if len(available_tids) == 0:
+            available_tids = dest_trials.new_trial_ids(last_tid)
+        
+        tid = available_tids.pop(0)
+        last_tid = tid
+
+        # copy in the ones that aren't worth exploring further
+        cpy = copy.deepcopy(src_trials.trials[idx])
+        cpy['exp_key'] = new_exp_key
+        cpy['tid'] = tid
+        cpy['misc']['tid'] = tid
+        del cpy['_id']
+
+        dest_trials.insert_trial_doc(cpy)
         
 
 def run_optimization(level=1):
