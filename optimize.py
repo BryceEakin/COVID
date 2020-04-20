@@ -28,10 +28,10 @@ LEVEL_DEFS = [
     (2,50),
     (3,50),
     (4,40),
-    (5,40),
-    (7,30),
-    (10,30),
-    (15,30),
+    (5,30),
+    (7,40),
+    (10,50),
+    (15,100),
 ]
 
 def make_json_friendly(result):
@@ -246,8 +246,8 @@ def run_optimization(level=1):
         depth, budget = LEVEL_DEFS[level-1]
         last_depth, _ = LEVEL_DEFS[level-2]
         
-        num_to_extend = int(np.ceiling(budget/2/(depth-last_depth)))
-        num_new = int(np.ceiling(budget/2/depth))
+        num_to_extend = int(np.ceil(budget/2/(depth-last_depth)))
+        num_new = int(np.ceil(budget/2/depth))
 
         if len(trials.trials) == 0:
             configure_next_level(level, num_new)
