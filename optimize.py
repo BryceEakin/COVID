@@ -17,8 +17,22 @@ from scipy.stats import linregress
 
 import numpy as np
 from datetime import timedelta
+import copy
+import requests
 
 from collections import Mapping, Iterable
+
+# List of depth, budget pairs
+LEVEL_DEFS = [
+    (1,100),
+    (2,50),
+    (3,50),
+    (4,40),
+    (5,40),
+    (7,30),
+    (10,30),
+    (15,30),
+]
 
 def make_json_friendly(result):
     if isinstance(result, list):
@@ -64,7 +78,7 @@ def make_json_list_friendly(lst):
     return output
 
 
-def test_parameterization(params, check_interrupted=None):
+def test_parameterization(params, num_epochs, check_interrupted=None):
     config = CovidTrainingConfiguration()
 
     hsh = hashlib.sha1('hyperopt'.encode())
@@ -72,7 +86,7 @@ def test_parameterization(params, check_interrupted=None):
 
     label = 'hyperopt_' + hsh.hexdigest()[:12]
 
-    config.max_epochs = 1
+    config.max_epochs = num_epochs
     config.batch_size = 24
 
     config.optim_adam_betas = (params['adam_beta1'], params['adam_beta2'])
@@ -91,6 +105,15 @@ def test_parameterization(params, check_interrupted=None):
 
     started_at = datetime.now()
 
+    training_state_path = f"./training_state/{label}__state.pkl.gz"
+
+    r = requests.get(f'https://10.0.1.4:8000/training-state/{label}', stream=True)
+
+    if r.status_code == 200:
+        with open(training_state_path, "wb") as f:
+            for chunk in r.iter_content(chunk_size=1024):
+                f.write(chunk)
+
     losses, validation_stats = train_model(
         config, 
         run_name=label,
@@ -98,6 +121,9 @@ def test_parameterization(params, check_interrupted=None):
         check_interrupted=check_interrupted, 
         disable_checkpointing=True
     )
+
+    with open(training_state_path, 'rb') as f:
+        requests.put(f'http://10.0.1.4:8000/training-state/{label}', data=f)
 
     runtime = datetime.now() - started_at
 
@@ -108,10 +134,13 @@ def test_parameterization(params, check_interrupted=None):
     
     v_x, vloss, _, _ = zip(*validation_stats)
 
-    slope, intercept, _, _, _ = linregress(v_x[-3:], vloss[-3:])
+    if num_epochs == 1:
+        slope, intercept, _, _, _ = linregress(v_x[-3:], vloss[-3:])
+    else:
+        slope, intercept, _, _, _ = linregress(v_x[-5:], vloss[-5:])
 
     result = make_json_friendly({
-        'loss': intercept + slope * (v_x[-1] + 0.5),
+        'loss': intercept + slope * (v_x[-1] + 1.0),
         'runtime': runtime.total_seconds(),
         'status': status,
         'label': label,
@@ -120,9 +149,67 @@ def test_parameterization(params, check_interrupted=None):
     })
     return result
 
-def run_optimization():
-    objective = functools.partial(test_parameterization, check_interrupted = check_interrupted)
-    
+
+def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
+    new_exp_key = f'covid-{lvl}'
+
+    src_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=f'covid-{lvl-1}')
+    all_trials = MongoTrials('mongo://localhost:1234/covid/jobs')
+    dest_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=new_exp_key)
+
+    forward_losses = []
+    for trial, loss in zip(src_trials.trials, src_trials.losses()):
+        if loss is None:
+            forward_losses.append(None)
+            continue
+
+        v_x, vloss, _, _ = zip(*trial['result']['validation_stats'])
+
+        slope, intercept, _, _, _ = linregress(v_x[-5:], vloss[-5:])
+        forward_losses.append(0.5 * (loss + intercept + slope * depth))
+
+    ordered_idxs = np.argsort([x if x is not None else np.inf for x in forward_losses])
+
+    last_tid = 0 if len(all_trials.tids) == 0 else max(all_trials.tids)
+    new_tids = []
+
+    for idx in ordered_idxs[num_suggestions:]:
+        if len(new_tids) == 0:
+            new_tids = dest_trials.new_trial_ids(last_tid)
+        
+        tid = new_tids.pop(0)
+        last_tid = tid
+
+        # copy in the ones that aren't worth exploring further
+        cpy = copy.deepcopy(src_trials.trials[idx])
+        cpy['exp_key'] = new_exp_key
+        cpy['tid'] = tid
+        cpy['misc']['tid'] = tid
+        dest_trials.insert_trial_doc(cpy)
+
+    new_specs = []
+    new_results = []
+    new_miscs = []
+
+    for idx in ordered_idxs[:num_suggestions]:
+        if len(new_tids) == 0:
+            new_tids = dest_trials.new_trial_ids(last_tid)
+
+        tid = new_tids.pop(0)
+        last_tid = tid
+        new_tids.append(tid)
+
+        new_specs.append(None)
+        new_results.append({'status': 'new'})
+
+        misc = copy.deepcopy(src_trials.trials[idx]['misc'])
+        misc['tid'] = tid
+        new_miscs.append(misc)
+
+    dest_trials.new_trial_docs(new_tids, new_specs, new_results, new_miscs)
+        
+
+def run_optimization(level=1):
     search_space = {
         'synthetic_negative_rate': hp.uniform('neg_rate', 0,1),
         'optim_initial_lr': 10 ** -hp.quniform('lr_exp', 2, 5, 0.25),
@@ -145,13 +232,34 @@ def run_optimization():
             ['relu', 'silu', 'tanh', 'leaky_relu', 'elu']),
     }
 
-    trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key='covid-1')
+    exp_key = f'covid-{level}'
+
+    trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=exp_key)
+
+    if level == 1:
+        max_evals = LEVEL_DEFS[0][1]
+        depth = 1
+
+    elif level > 1:
+        depth, budget = LEVEL_DEFS[level-1]
+        last_depth, _ = LEVEL_DEFS[level-2]
+        
+        num_to_extend = int(np.ceiling(budget/2/(depth-last_depth)))
+        num_new = int(np.ceiling(budget/2/depth))
+
+        if len(trials.trials) == 0:
+            configure_next_level(level, num_new)
+        
+        max_evals = num_to_extend + num_new
+        trials.refresh()
+
+    objective = functools.partial(test_parameterization, num_epochs=depth)
     
     best = hyperopt.fmin(
         objective,
         space=search_space,
         algo=hyperopt.tpe.suggest,
-        max_evals=100,
+        max_evals=max_evals,
         trials=trials
     )
 
@@ -164,7 +272,8 @@ if __name__ == '__main__':
         global interrupted
         return interrupted
 
-    run_optimization()
+    for lvl in range(1, len(LEVEL_DEFS) + 1):
+        run_optimization(lvl)
 
     
     # th = threading.Thread(target=run_optimization, daemon=False)

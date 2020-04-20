@@ -133,10 +133,10 @@ raw_data/
 
 # Most outputs
 data/**/*
-checkpoints/*
-training_state/*
-logs/*
+checkpoints/
+training_state/
+logs/
 logfile.txt
-training_state/*
+training_state/
 *.csv.gz
-outputs/*.csv.gz
+outputs/

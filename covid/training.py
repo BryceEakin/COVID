@@ -32,12 +32,15 @@ def initialize_logger(run_name,
     logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
      
+    handlers = []
+
     # create console handler and set level to info
     handler = logging.StreamHandler()
     handler.setLevel(print_lvl)
     formatter = logging.Formatter(f"{run_name} | [%(levelname)s] %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    handlers.append(handler)
 
     # create debug file handler and set level to debug
     handler = logging.FileHandler(os.path.join(
@@ -48,6 +51,9 @@ def initialize_logger(run_name,
     formatter = logging.Formatter("%(asctime)s | [%(levelname)s] %(message)s")
     handler.setFormatter(formatter)
     logger.addHandler(handler)
+    handlers.append(handler)
+
+    return handlers
 
 
 @dataclass
@@ -197,7 +203,7 @@ def train_model(config:CovidTrainingConfiguration,
     if run_name is None:
         run_name = f"train_fold{config.training_fold:02}" if config.training_fold is not None else "train_global"
 
-    initialize_logger(run_name, print_lvl=config.verbosity)
+    logging_handlers = initialize_logger(run_name, print_lvl=config.verbosity)
 
     logging.info(f"Training initializing -- {run_name}")
     
@@ -354,4 +360,7 @@ def train_model(config:CovidTrainingConfiguration,
         with gzip.open(training_state_path + ".gz", 'wb') as f:
             T.save(state, f)
     
+    for handler in logging_handlers:
+        logging.getLogger().removeHandler(handler)
+
     return losses, validation_stats
