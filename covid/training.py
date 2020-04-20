@@ -314,7 +314,7 @@ def train_model(config:CovidTrainingConfiguration,
             if pct_epoch == 1.0 or epoch + pct_epoch - last_validation > config.validation_frequency:
                 logging.info("Generating validation stats")
 
-                vloss, vacc, v_conf, v_output = get_validation_loss()
+                vloss, vacc, v_conf, v_outputs = get_validation_loss()
                 model.train()
                 v_outputs.to_csv(os.path.join(
                     config.root_folder, 
