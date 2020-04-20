@@ -193,7 +193,7 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         new_results.append({'status': 'new'})
 
         misc = copy.deepcopy(src_trials.trials[idx]['misc'])
-        del misc['tid']
+        misc['tid'] = tid
         new_miscs.append(misc)
 
     dest_trials.insert_trial_doc(
