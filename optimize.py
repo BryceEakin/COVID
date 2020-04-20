@@ -107,7 +107,7 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
 
     training_state_path = f"./training_state/{label}__state.pkl.gz"
 
-    r = requests.get(f'https://10.0.1.4:8000/training-state/{label}', stream=True)
+    r = requests.get(f'https://localhost:5535/training-state/{label}', stream=True)
 
     if r.status_code == 200:
         with open(training_state_path, "wb") as f:
@@ -123,7 +123,7 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
     )
 
     with open(training_state_path, 'rb') as f:
-        requests.put(f'http://10.0.1.4:8000/training-state/{label}', data=f)
+        requests.put(f'http://localhost:5535/training-state/{label}', data=f)
 
     runtime = datetime.now() - started_at
 

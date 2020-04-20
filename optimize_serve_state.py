@@ -7,7 +7,7 @@ from hyperopt.mongoexp import MongoTrials
 from datetime import datetime
 import logging
 
-PORT = 8000
+PORT = 5535
 
 app = Sanic(name='CovidProject')
 
