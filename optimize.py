@@ -210,6 +210,8 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         
 
 def run_optimization(level=1):
+    print(f"Optimizing at level {level}")
+
     search_space = {
         'synthetic_negative_rate': hp.uniform('neg_rate', 0,1),
         'optim_initial_lr': 10 ** -hp.quniform('lr_exp', 2, 5, 0.25),
@@ -255,15 +257,18 @@ def run_optimization(level=1):
 
     objective = functools.partial(test_parameterization, num_epochs=depth)
     
-    best = hyperopt.fmin(
-        objective,
-        space=search_space,
-        algo=hyperopt.tpe.suggest,
-        max_evals=max_evals,
-        trials=trials
-    )
+    if len(trials) >= max_evals:
+        print(f"Already completed level {level} -- skipping")
+    else:
+        best = hyperopt.fmin(
+            objective,
+            space=search_space,
+            algo=hyperopt.tpe.suggest,
+            max_evals=max_evals,
+            trials=trials
+        )
 
-    print(best)
+        print(best)
 
 if __name__ == '__main__':
     
