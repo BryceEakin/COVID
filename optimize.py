@@ -171,13 +171,13 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
     ordered_idxs = np.argsort([x if x is not None else np.inf for x in forward_losses])
 
     last_tid = 0 if len(all_trials.tids) == 0 else max(all_trials.tids)
-    new_tids = []
-
+    available_tids = []
+    
     for idx in ordered_idxs[num_suggestions:]:
-        if len(new_tids) == 0:
-            new_tids = dest_trials.new_trial_ids(last_tid)
+        if len(available_tids) == 0:
+            available_tids = dest_trials.new_trial_ids(last_tid)
         
-        tid = new_tids.pop(0)
+        tid = available_tids.pop(0)
         last_tid = tid
 
         # copy in the ones that aren't worth exploring further
@@ -186,18 +186,22 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         cpy['tid'] = tid
         cpy['misc']['tid'] = tid
         del cpy['_id']
-        
+
         dest_trials.insert_trial_doc(cpy)
 
+    new_tids = []
     new_specs = []
     new_results = []
     new_miscs = []
 
     for idx in ordered_idxs[:num_suggestions]:
-        if len(new_tids) == 0:
-            new_tids = dest_trials.new_trial_ids(last_tid)
+        if src_trials.losses()[idx] is None:
+            continue
 
-        tid = new_tids.pop(0)
+        if len(available_tids) == 0:
+            available_tids = dest_trials.new_trial_ids(last_tid)
+
+        tid = available_tids.pop(0)
         last_tid = tid
         new_tids.append(tid)
 
@@ -252,9 +256,12 @@ def run_optimization(level=1):
         num_new = int(np.ceil(budget/2/depth))
 
         if len(trials.trials) == 0:
-            configure_next_level(level, num_new)
+            configure_next_level(level, num_to_extend)
         
-        max_evals = num_to_extend + num_new
+        last_level_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=f'covid-{level-1}')
+        prev_level_count = len([x for x in last_level_trials.losses() if x is not None])
+
+        max_evals = prev_level_count + num_new
         trials.refresh()
 
     objective = functools.partial(test_parameterization, num_epochs=depth)
