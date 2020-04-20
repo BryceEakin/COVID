@@ -97,3 +97,24 @@ INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_9de
 INFO (root): Saving state
 INFO (hyperopt.mongoexp): job exception: ('SONify', datetime.timedelta(seconds=11556, microseconds=913381), {'loss': 0.2085860491709038, 'runtime': datetime.timedelta(seconds=11556, microseconds=913381), 'status': 'ok', 'label': 'hyperopt_9def6925ad67'})
 INFO (root): Training initializing -- hyperopt_101cf160a82e
+INFO (root): Training initializing -- hyperopt_757f5a251300
+INFO (root): No previous training state to load
+INFO (root): Beginning epoch 0
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_757f5a251300_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_757f5a251300_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_757f5a251300_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_757f5a251300_performance.png"
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_757f5a251300_performance.png"
+INFO (root): Saving state
+INFO (root): Training initializing -- hyperopt_b4ed6fb5f5cc
+INFO (root): No previous training state to load
+INFO (root): Beginning epoch 0
+INFO (root): Generating validation stats
+INFO (root): Generated validation stats -- plot saved to ".\outputs/hyperopt_b4ed6fb5f5cc_performance.png"
+INFO (root): Generating validation stats
+INFO (hyperopt.mongoexp): job exception: Couldn't open shared event: <torch_29504_502153324_event>, error code: <2>

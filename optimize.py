@@ -110,16 +110,14 @@ def test_parameterization(params, check_interrupted=None):
 
     slope, intercept, _, _, _ = linregress(v_x[-3:], vloss[-3:])
 
-    result = {
+    result = make_json_friendly({
         'loss': intercept + slope * (v_x[-1] + 0.5),
         'runtime': runtime.total_seconds(),
         'status': status,
         'label': label,
-        #'attachments':{
-        #    'training_loss_hist': pkl.dumps(losses),
-        #    'validation_stats': pkl.dumps(validation_stats)
-        #}
-    }
+        'training_loss_hist': losses,
+        'validation_stats': validation_stats,
+    })
     return result
 
 def run_optimization():
