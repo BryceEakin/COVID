@@ -24,7 +24,7 @@ from collections import Mapping, Iterable
 
 # List of depth, budget pairs
 LEVEL_DEFS = [
-    (1,100),
+    (1,90),
     (2,50),
     (3,50),
     (4,40),
