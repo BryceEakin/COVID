@@ -196,8 +196,8 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         misc['tid'] = tid
         new_miscs.append(misc)
 
-    dest_trials.insert_trial_doc(
-        dest_trials.new_trial_docs(new_tids, new_specs, new_results, new_miscs)[0]
+    dest_trials.insert_trial_docs(
+        dest_trials.new_trial_docs(new_tids, new_specs, new_results, new_miscs)
     )
 
     for idx in ordered_idxs[num_suggestions:]:
