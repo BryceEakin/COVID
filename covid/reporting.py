@@ -19,6 +19,7 @@ ConfusionMatrix = namedtuple('ConfusionMatrix', ['tp', 'fp', 'fn', 'tn'])
 
 __ALL__ = [
     'get_performance_plots',
+    'get_performance_stats',
     'calculate_average_loss_and_accuracy',
     'ConfusionMatrix'
 ]
@@ -62,6 +63,25 @@ def plot_stat(ax, x, stat, title, ylim=(0.0,1.0)):
     ax.legend(loc='best')
     ax.set_ylabel(title)
 
+def get_performance_stats(validation_stats):
+    valid_x, valid_y, valid_acc, valid_conf = zip(*validation_stats)
+    tp, fp, fn, tn = zip(*valid_conf)
+    tp, fp, fn, tn = np.stack(tp), np.stack(fp), np.stack(fn), np.stack(tn)
+    accuracy = (tp + tn) / (tp + tn + fp + fn)
+    precision = tp/np.maximum(tp+fp, 1e-5)
+    recall = tp/np.maximum(tp+fn, 1e-5)
+    f1 = 2*tp/np.maximum(2*tp + fp + fn, 1e-5)
+    mcc = (tp*tn-fp*fn)/np.sqrt(np.maximum((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn),1e-5))
+
+    return {
+        'epoch': valid_x, 
+        'accuracy': accuracy, 
+        'precision': precision, 
+        'recall': recall,
+        'f1': f1, 
+        'mcc': mcc
+    }
+
 def get_performance_plots(losses, validation_stats, period=None):
     loss_x, loss_y = zip(*losses)
     valid_x, valid_y, valid_acc, valid_conf = zip(*validation_stats)
@@ -71,25 +91,15 @@ def get_performance_plots(losses, validation_stats, period=None):
         
         plot_loss(axes[0,0], loss_x, loss_y, valid_x, valid_y, period)
         axes[0,0].set_ylabel('Loss')
-        
-        tp, fp, fn, tn = zip(*valid_conf)
-        tp, fp, fn, tn = np.stack(tp), np.stack(fp), np.stack(fn), np.stack(tn)
 
-        #accuracy = np.stack(valid_acc)
-        accuracy = (tp + tn) / (tp + tn + fp + fn)
-        plot_stat(axes[0,1], valid_x, accuracy, 'Accuracy')
+        stats = get_performance_stats(validation_stats)
+        valid_x = stats['epoch']
         
-        precision = tp/np.maximum(tp+fp, 1e-5)
-        plot_stat(axes[1,0], valid_x, precision, 'Precision')
-        
-        recall = tp/np.maximum(tp+fn, 1e-5)
-        plot_stat(axes[1,1], valid_x, recall, 'Recall')
-
-        f1 = 2*tp/np.maximum(2*tp + fp + fn, 1e-5)
-        plot_stat(axes[2,0], valid_x, f1, 'F1')
-
-        mcc = (tp*tn-fp*fn)/np.sqrt(np.maximum((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn),1e-5))
-        plot_stat(axes[2,1], valid_x, mcc, "MCC / Pearson's Phi")
+        plot_stat(axes[0,1], valid_x, stats['accuracy'], 'Accuracy')
+        plot_stat(axes[1,0], valid_x, stats['precision'], 'Precision')
+        plot_stat(axes[1,1], valid_x, stats['recall'], 'Recall')
+        plot_stat(axes[2,0], valid_x, stats['f1'], 'F1')
+        plot_stat(axes[2,1], valid_x, stats['mcc'], "MCC / Pearson's Phi")
         
     return fig
 

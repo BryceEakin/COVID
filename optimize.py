@@ -35,6 +35,28 @@ LEVEL_DEFS = [
     (15,100),
 ]
 
+SEARCH_SPACE = {
+        'synthetic_negative_rate': hp.uniform('neg_rate', 0,1),
+        'optim_initial_lr': 10 ** -hp.quniform('lr_exp', 2, 5, 0.25),
+        'adam_beta1': 1-hp.loguniform('inv_beta1', -5, -1),
+        'adam_beta2': 1-hp.loguniform('inv_beta2', -8, -2),
+        'optim_adam_eps': hp.loguniform('eps', -15, 0),
+        'dropout_rate': hp.uniform('dropout_rate', 0.01, 0.8),
+        'chem_layers_per_message': hp.quniform('chem_layers_per_message', 1,4,1),
+        'chem_hidden_size': hp.quniform('chem_hidden_size', 64,512,64),
+        'chem_nonlinearity': hp.choice(
+            'chem_nonlinearity',
+            ['ReLU', 'LeakyReLU', 'tanh', 'ELU']),
+        'protein_base_dim': hp.quniform('protien_base_dim', 16,128,16),
+        'protein_output_dim': hp.quniform('protein_out_dim', 64, 384, 64),
+        'protein_nonlinearity': hp.choice(
+            'protein_nonlinearity', 
+            ['relu', 'silu', 'tanh', 'leaky_relu', 'elu']),
+        'protein_downscale_nonlinearity': hp.choice(
+            'protein_downscale_nonlinearity', 
+            ['relu', 'silu', 'tanh', 'leaky_relu', 'elu']),
+    }
+
 def make_json_friendly(result):
     if isinstance(result, list):
         return make_json_list_friendly(result)
@@ -239,28 +261,6 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
 def run_optimization(level=1):
     print(f"Optimizing at level {level}")
 
-    search_space = {
-        'synthetic_negative_rate': hp.uniform('neg_rate', 0,1),
-        'optim_initial_lr': 10 ** -hp.quniform('lr_exp', 2, 5, 0.25),
-        'adam_beta1': 1-hp.loguniform('inv_beta1', -5, -1),
-        'adam_beta2': 1-hp.loguniform('inv_beta2', -8, -2),
-        'optim_adam_eps': hp.loguniform('eps', -15, 0),
-        'dropout_rate': hp.uniform('dropout_rate', 0.01, 0.8),
-        'chem_layers_per_message': hp.quniform('chem_layers_per_message', 1,4,1),
-        'chem_hidden_size': hp.quniform('chem_hidden_size', 64,512,64),
-        'chem_nonlinearity': hp.choice(
-            'chem_nonlinearity',
-            ['ReLU', 'LeakyReLU', 'tanh', 'ELU']),
-        'protein_base_dim': hp.quniform('protien_base_dim', 16,128,16),
-        'protein_output_dim': hp.quniform('protein_out_dim', 64, 384, 64),
-        'protein_nonlinearity': hp.choice(
-            'protein_nonlinearity', 
-            ['relu', 'silu', 'tanh', 'leaky_relu', 'elu']),
-        'protein_downscale_nonlinearity': hp.choice(
-            'protein_downscale_nonlinearity', 
-            ['relu', 'silu', 'tanh', 'leaky_relu', 'elu']),
-    }
-
     exp_key = f'covid-{level}'
 
     trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=exp_key)
@@ -293,7 +293,7 @@ def run_optimization(level=1):
     else:
         best = hyperopt.fmin(
             objective,
-            space=search_space,
+            space=SEARCH_SPACE,
             algo=hyperopt.tpe.suggest,
             max_evals=max_evals,
             trials=trials
