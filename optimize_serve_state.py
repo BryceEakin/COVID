@@ -133,15 +133,15 @@ async def get_current_best(request, n=0):
     state_lookup[-1] = 'JOB_STATE_Prev-Level Hints'
     counters = defaultdict(lambda: Counter())
 
-    for tr in TRIALS.trials:
-        if 'training_loss_hist' in tr['result'] and tr['state'] == hyperopt.JOB_STATE_DONE:
-            epoch = int(tr['result']['training_loss_hist'][-1][0])
-            if tr['exp_key'] != f'covid-{epoch}':
-                counters[tr['exp_key']][-1] += 1
+    for t in TRIALS.trials:
+        if 'training_loss_hist' in t['result'] and t['state'] == hyperopt.JOB_STATE_DONE:
+            epoch = int(t['result']['training_loss_hist'][-1][0])
+            if t['exp_key'] != f'covid-{epoch}':
+                counters[t['exp_key']][-1] += 1
             else:
-                counters[tr['exp_key']][tr['state']] += 1
+                counters[t['exp_key']][t['state']] += 1
         else:
-            counters[tr['exp_key']][tr['state']] += 1
+            counters[t['exp_key']][t['state']] += 1
 
     status_table = f"""
         <table class="table table-striped table-sm w-auto mt-4">
