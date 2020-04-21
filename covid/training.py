@@ -263,7 +263,7 @@ def train_model(config:CovidTrainingConfiguration,
         except:
             state = None
             logging.info("Previous state corrupt -- training from scratch")
-            os.remove(training_state_path)
+            os.remove(training_state_path + '.gz')
 
     if state is not None:
         epoch = state.get('epoch', epoch-1) + 1
