@@ -149,8 +149,11 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
         disable_checkpointing=True
     )
 
-    with open(training_state_path, 'rb') as f:
-        requests.put(f'http://localhost:5535/training-state/{label}', data=f)
+    try:
+        with open(training_state_path, 'rb') as f:
+            requests.put(f'http://localhost:5535/training-state/{label}', data=f)
+    except:
+        print("Failed to push model state!")
 
     runtime = datetime.now() - started_at
 
