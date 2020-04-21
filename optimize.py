@@ -199,6 +199,7 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
 
         misc = copy.deepcopy(src_trials.trials[idx]['misc'])
         misc['tid'] = tid
+        misc['idxs'] = {k:[tid] for k in misc['idxs'].keys()}
         new_miscs.append(misc)
 
     dest_trials.insert_trial_docs(
