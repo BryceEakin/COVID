@@ -58,6 +58,13 @@ async def put_training_state(request, run_id):
     shutil.move(f"./training_state/{run_id}__state.pkl.gz.tmp", f"./training_state/{run_id}__state.pkl.gz")
     return text("Model State Uploaded")
 
+def make_button(to, icon, disabled=False):
+    return f"""
+        <a class="btn btn-info px-3 {'disabled' if disabled else ''}" role="button" href="{to}">
+            <i class="fa fa-{icon}"></i>
+        </a>
+    """
+
 @app.get("/best-trials/<n:int>")
 async def get_current_best(request, n=0):
     if request.args.get('refresh', False):
@@ -65,20 +72,41 @@ async def get_current_best(request, n=0):
     
     n = int(n)
 
-    losses = [tr['result'].get('training_loss_hist', [(0,np.inf)])[-1][1] for tr in TRIALS.trials]
-
-    idx_list = np.argsort([x if x is not None else np.inf for x in TRIALS.losses()])
+    trials = list(TRIALS.trials)
+    trials.sort(key=lambda x: x['exp_key'], reverse=True)
     
-    tr = TRIALS.trials[idx_list[n]]
+    losses = []
+    for tr in trials:
+        #loss = tr['result'].get('training_loss_hist', [(0,np.inf)])[-1][1]
+        loss = tr['result'].get('loss', np.inf)
+        if loss in losses:
+            losses.append(np.inf)
+        else:
+            losses.append(loss)
+
+    idx_list = np.argsort([x if x is not None else np.inf for x in losses])
+    
+    tr = trials[idx_list[n]]
     fig = get_performance_plots(tr['result']['training_loss_hist'], tr['result']['validation_stats'])
     img = fig_to_base64(fig, close=True).decode('utf-8')
-    prev_btn = f'<button onclick="window.location.href = \'/best-trials/{n-1}\';">&lt;</button>'
-    next_btn = f'<button onclick="window.location.href = \'/best-trials/{n+1}\';">&gt;</button>'
+    first_btn = make_button(f"/best-trials/0", "fast-backward")
+    prev_btn = make_button(f"/best-trials/{n-1}", "chevron-left", n == 0)
+    refresh_btn = make_button(f"/best-trials/{n}?refresh=True", "repeat")
+    next_btn = make_button(f"/best-trials/{n+1}", "chevron-right")
+    
     return html(f"""
-        <html><body>
-        {prev_btn if n > 0 else ''} &nbsp; {next_btn}<br><br>
-        {tr["result"]["loss"]}<br>
-        <img src="data:image/png;base64, {img}"  style="width: 100%; height: auto;"/>
+        <html>
+        <head><meta name="viewport" content="width=device-width, initial-scale=1"/></head>
+        <body>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+        <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+        <div class="col-md-12 mb-4 text-center">
+        {first_btn}{prev_btn}{refresh_btn}{next_btn}<br><br>
+        </div>
+        <div>
+        <span>{tr["exp_key"]} | {tr["result"]["loss"]}</span>
+        </div><br>
+        <img src="data:image/png;base64, {img}" class="img-fluid"/>
         </body></html>
     """)
 

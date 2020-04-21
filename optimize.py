@@ -278,7 +278,7 @@ def run_optimization(level=1):
 
         if len(trials.trials) == 0:
             print("Generating estimates from previous level")
-            configure_next_level(level, num_to_extend)
+            configure_next_level(level, depth, num_to_extend)
         
         last_level_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=f'covid-{level-1}')
         prev_level_count = len([x for x in last_level_trials.losses() if x is not None])
