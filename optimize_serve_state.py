@@ -56,7 +56,7 @@ def fig_to_base64(fig, close=False, **save_kwargs):
         plt.close(fig)
     return result
 
-PORT = 5000
+PORT = 5535
 
 app = Sanic(name='CovidProject')
 TRIALS = MongoTrials('mongo://localhost:1234/covid/jobs')
