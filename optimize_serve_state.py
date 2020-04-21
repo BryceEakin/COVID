@@ -19,6 +19,8 @@ from covid.constants import MODE_NAMES
 import hyperopt
 from hyperopt import hp
 
+from collections import Counter, defaultdict
+
 SEARCH_SPACE = {
     'synthetic_negative_rate': hp.uniform('neg_rate', 0,1),
     'optim_initial_lr': 10 ** -hp.quniform('lr_exp', 2, 5, 0.25),
@@ -54,7 +56,7 @@ def fig_to_base64(fig, close=False, **save_kwargs):
         plt.close(fig)
     return result
 
-PORT = 5535
+PORT = 5000
 
 app = Sanic(name='CovidProject')
 TRIALS = MongoTrials('mongo://localhost:1234/covid/jobs')
@@ -80,7 +82,7 @@ async def put_training_state(request, run_id):
             f.write(chunk)
 
     if os.path.exists(f"./training_state/{run_id}__state.pkl.gz"):
-        os.remove(f"./training_state/{run_id}__state.pkl.gz.tmp")
+        os.remove(f"./training_state/{run_id}__state.pkl.gz")
     shutil.move(f"./training_state/{run_id}__state.pkl.gz.tmp", f"./training_state/{run_id}__state.pkl.gz")
     return text("Model State Uploaded")
 
@@ -127,27 +129,64 @@ async def get_current_best(request, n=0):
 
     params = hyperopt.space_eval(SEARCH_SPACE, {k:v[0] for k,v in tr['misc'].get('vals',{}).items()})
 
+    state_lookup = {getattr(hyperopt, k):k for k in ['JOB_STATE_NEW', 'JOB_STATE_ERROR', 'JOB_STATE_RUNNING', 'JOB_STATE_DONE']}
+    state_lookup[-1] = 'JOB_STATE_Prev-Level Hints'
+    counters = defaultdict(lambda: Counter())
+
+    for tr in TRIALS.trials:
+        if 'training_loss_hist' in tr['result'] and tr['state'] == hyperopt.JOB_STATE_DONE:
+            epoch = int(tr['result']['training_loss_hist'][-1][0])
+            if tr['exp_key'] != f'covid-{epoch}':
+                counters[tr['exp_key']][-1] += 1
+            else:
+                counters[tr['exp_key']][tr['state']] += 1
+        else:
+            counters[tr['exp_key']][tr['state']] += 1
+
+    status_table = f"""
+        <table class="table table-striped table-sm w-auto mt-4">
+        <thead class="thead-light">
+        <th>Hyperopt Pass</th><th>{'</th><th>'.join(state_lookup[i][10:].title() for i in range(-1,4))}</th>
+        </thead>
+        <tbody>
+        {''.join('<tr><th>' + k + '</th><td>' + '</td><td>'.join(
+            str(counters[k][c]) for c in range(-1,4)
+        ) + '</td></tr>' for k in counters.keys())}
+        </tbody>
+        <table>
+    """
+
     return html(f"""
         <html>
         <head><meta name="viewport" content="width=device-width, initial-scale=1"/></head>
         <body>
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
         <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+        <div>
+        <h3>Status</h3>
+        {status_table}
+        </div>
+        <h3>Run Details</h3>
         <div class="col-md-12 mb-4 mt-4 text-center">
         {first_btn}{prev_btn}{refresh_btn}{next_btn}<br><br>
         </div>
-        <table class="table table-striped">
-        <thead class="thead-light"><th>stat</th><th>{'</th><th>'.join(MODE_NAMES)}</th></thead>
+        <table class="table table-striped table-sm w-auto ml-1">
         <tbody>
         <tr><th>Pass/Loss</th><td>{tr["exp_key"]}</td><td>{'{0:0.3f}'.format(tr['result']['loss'])}</td></tr>
+        <tr><th>Epoch</th><td>{stats['epoch'][-1]:0.3f}</td></tr>
+        </tbody>
+        </table>
+        <table class="table table-striped table-sm w-auto ml-1">
+        <thead class="thead-light"><th>stat</th><th>{'</th><th>'.join(MODE_NAMES)}</th></thead>
+        <tbody>
         {''.join('<tr><th>' + k + '</th><td>' + '</td><td>'.join(
-            '{0:0.3f}'.format(v) for v in (vals[-1] if k != 'epoch' else [vals[-1]])) 
-            + '</td></tr>' for k,vals in stats.items()
+                '{0:0.3f}'.format(v) for v in vals[-1]
+            ) + '</td></tr>' for k,vals in stats.items() if k != 'epoch'
         )}
         </tbody></table>
         <img src="data:image/png;base64, {img}" class="img-fluid"/>
-        <h2>Parameters</h2>
-        <table>
+        <h4>Parameters</h4>
+        <table class="table table-sm w-auto ml-1" >
         <tr>{'</tr><tr>'.join('<th>{0}</th><td>{1}</td>'.format(k,v) for k,v in params.items())}</tr>
         </table>
         </body></html>
