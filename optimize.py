@@ -1,27 +1,24 @@
+import copy
 import functools
+import hashlib
 import os
 import pickle as pkl
+import shutil
+import string
 import threading
-from datetime import datetime
+import time
+from collections import Iterable, Mapping
+from datetime import datetime, timedelta
 
 import hyperopt
+import numpy as np
+import requests
 from hyperopt import hp
 from hyperopt.mongoexp import MongoTrials
+from scipy.stats import linregress
 
 from covid.training import CovidTrainingConfiguration, train_model
 from covid.utils import getch
-import string
-import hashlib
-
-from scipy.stats import linregress
-
-import numpy as np
-from datetime import timedelta
-import copy
-import requests
-import shutil
-
-from collections import Mapping, Iterable
 
 # List of depth, budget pairs
 LEVEL_DEFS = [
@@ -227,9 +224,7 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         misc['idxs'] = {k:[tid] for k in misc['idxs'].keys()}
         new_miscs.append(misc)
 
-    dest_trials.insert_trial_docs(
-        dest_trials.new_trial_docs(new_tids, new_specs, new_results, new_miscs)
-    )
+    result_docs = dest_trials.new_trial_docs(new_tids, new_specs, new_results, new_miscs)
 
     for idx in ordered_idxs[num_suggestions:]:
         if src_trials.losses()[idx] is None:
@@ -251,7 +246,21 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
 
         del cpy['_id']
 
-        dest_trials.insert_trial_doc(cpy)
+        result_docs.append(cpy)
+    
+    return result_docs
+
+
+def create_suggestion_box(docs):
+    docs = list(docs)
+    def suggest(*args, **kwargs):
+        nonlocal docs
+        if len(docs) > 0:
+            doc_copy = list(docs)
+            docs.clear()
+            return doc_copy
+
+        return hyperopt.tpe.suggest(*args, **kwargs)
 
 
 # def create_suggestion_box(trials_to_use):
@@ -259,14 +268,14 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
 #         nonlocal trials_to_use
 
 #     return trials.new_trial_docs([])
-        
-
 def run_optimization(level=1):
     print(f"Optimizing at level {level}")
 
     exp_key = f'covid-{level}'
 
     trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=exp_key)
+
+    suggestion_box = hyperopt.tpe.suggest
 
     if level == 1:
         max_evals = LEVEL_DEFS[0][1]
@@ -281,7 +290,9 @@ def run_optimization(level=1):
 
         if len(trials.trials) == 0:
             print("Generating estimates from previous level")
-            configure_next_level(level, depth, num_to_extend)
+            result_docs = configure_next_level(level, depth, num_to_extend)
+
+            suggestion_box = create_suggestion_box(result_docs)
         
         last_level_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=f'covid-{level-1}')
         prev_level_count = len([x for x in last_level_trials.losses() if x is not None])
@@ -297,7 +308,7 @@ def run_optimization(level=1):
         best = hyperopt.fmin(
             objective,
             space=SEARCH_SPACE,
-            algo=hyperopt.tpe.suggest,
+            algo=suggestion_box,
             max_evals=max_evals,
             trials=trials
         )
