@@ -253,14 +253,19 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
 
 def create_suggestion_box(docs):
     docs = list(docs)
-    def suggest(*args, **kwargs):
+    def suggest(new_ids, domain, trials, seed, *args, **kwargs):
         nonlocal docs
-        if len(docs) > 0:
+        if docs is not None:
             doc_copy = list(docs)
-            docs.clear()
+            docs = None
+
+            for doc in doc_copy:
+                doc['misc']['cmd'] = domain.cmd
+                doc['misc']['workdir'] = domain.workdir
+
             return doc_copy
 
-        return hyperopt.tpe.suggest(*args, **kwargs)
+        return hyperopt.tpe.suggest(new_ids, domain, trials, seed, *args, **kwargs)
 
 
 # def create_suggestion_box(trials_to_use):
@@ -302,7 +307,7 @@ def run_optimization(level=1):
 
     objective = functools.partial(test_parameterization, num_epochs=depth)
     
-    if len(trials) >= max_evals:
+    if len([x for x in trials.statuses() if x == 'ok']) >= max_evals:
         print(f"Already completed level {level} -- skipping")
     else:
         best = hyperopt.fmin(
