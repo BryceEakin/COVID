@@ -67,7 +67,7 @@ async def get_current_best(request, n=0):
 
     losses = [tr['result'].get('training_loss_hist', [(0,np.inf)])[-1][1] for tr in TRIALS.trials]
 
-    idx_list = np.argsort([x if x is not None else np.inf for x in losses])
+    idx_list = np.argsort([x if x is not None else np.inf for x in TRIALS.losses()])
     
     tr = TRIALS.trials[idx_list[n]]
     fig = get_performance_plots(tr['result']['training_loss_hist'], tr['result']['validation_stats'])
