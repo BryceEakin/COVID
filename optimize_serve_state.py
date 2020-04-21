@@ -172,7 +172,9 @@ async def get_current_best(request, n=0):
         </div>
         <table class="table table-striped table-sm w-auto ml-1">
         <tbody>
-        <tr><th>Pass/Loss</th><td>{tr["exp_key"]}</td><td>{'{0:0.3f}'.format(tr['result'].get('loss',np.inf))}</td></tr>
+        <tr><th>Pass</th><td>{tr["exp_key"]}</td></tr>
+        <tr><th>Raw Loss</th><td>{tr['result'].get('training_loss_hist',[(0,np.inf)])[-1][1]}</td></tr>
+        <tr><th>Adj Loss</th><td>{'{0:0.3f}'.format(tr['result'].get('loss',np.inf))}
         <tr><th>Epoch</th><td>{stats['epoch'][-1]:0.3f}</td></tr>
         </tbody>
         </table>
