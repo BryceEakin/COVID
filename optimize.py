@@ -200,10 +200,7 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
     last_tid = 0 if len(all_trials.tids) == 0 else max(all_trials.tids)
     available_tids = []
     
-    new_tids = []
-    new_specs = []
-    new_results = []
-    new_miscs = []
+    result_docs = []
 
     for idx in ordered_idxs[:num_suggestions]:
         if src_trials.losses()[idx] is None:
@@ -212,19 +209,11 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         if len(available_tids) == 0:
             available_tids = dest_trials.new_trial_ids(last_tid)
 
-        tid = available_tids.pop(0)
-        last_tid = tid
-        new_tids.append(tid)
-
-        new_specs.append(None)
-        new_results.append({'status': 'new'})
-
+        spec = None
+        result = {'status': 'new'}
         misc = copy.deepcopy(src_trials.trials[idx]['misc'])
-        misc['tid'] = tid
-        misc['idxs'] = {k:[tid] for k in misc['idxs'].keys()}
-        new_miscs.append(misc)
-
-    result_docs = dest_trials.new_trial_docs(new_tids, new_specs, new_results, new_miscs)
+        
+        result_docs.append((spec, result, misc))
 
     for idx in ordered_idxs[num_suggestions:]:
         if src_trials.losses()[idx] is None:
@@ -246,7 +235,7 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
 
         del cpy['_id']
 
-        result_docs.append(cpy)
+        dest_trials.insert_trial_doc(cpy)
     
     return result_docs
 
@@ -255,15 +244,20 @@ def create_suggestion_box(docs):
     docs = list(docs)
     def suggest(new_ids, domain, trials, seed, *args, **kwargs):
         nonlocal docs
-        if docs is not None:
-            doc_copy = list(docs)
-            docs = None
+        if len(docs) > 0:
+            num_to_take = min(len(new_ids), len(docs))
+            
+            selected_docs = docs[:num_to_take]
+            docs = docs[num_to_take:]
 
-            for doc in doc_copy:
-                doc['misc']['cmd'] = domain.cmd
-                doc['misc']['workdir'] = domain.workdir
+            sel_spec, sel_result, sel_misc = zip(*selected_docs)
 
-            return doc_copy
+            for tid, misc in zip(new_ids[:num_to_take], sel_misc):
+                misc['cmd'] = domain.cmd
+                misc['workdir'] = domain.workdir
+                misc['tid'] = tid
+
+            return trials.new_trial_docs(new_ids[:num_to_take], sel_spec, sel_result, sel_misc)
 
         return hyperopt.tpe.suggest(new_ids, domain, trials, seed, *args, **kwargs)
 
