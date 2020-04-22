@@ -267,6 +267,8 @@ def create_suggestion_box(docs):
 
         return hyperopt.tpe.suggest(new_ids, domain, trials, seed, *args, **kwargs)
 
+    return suggest
+
 
 # def create_suggestion_box(trials_to_use):
 #     def suggest_with_tpe_fallback(new_ids, domain, trails, seed):
