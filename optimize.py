@@ -255,6 +255,7 @@ def create_suggestion_box(docs):
             for tid, misc in zip(new_ids[:num_to_take], sel_misc):
                 misc['cmd'] = domain.cmd
                 misc['workdir'] = domain.workdir
+                misc['idxs'] = {k:[tid] for k in misc['idxs'].keys()}
                 misc['tid'] = tid
 
             return trials.new_trial_docs(new_ids[:num_to_take], sel_spec, sel_result, sel_misc)
