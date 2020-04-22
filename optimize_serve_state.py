@@ -167,6 +167,8 @@ async def get_current_best(request, n=0):
     trials = list(TRIALS.trials)
     trials.sort(key=lambda x: x['exp_key'], reverse=True)
 
+    trials = [x for x in trials if x['exp_key'] == trials[0]['exp_key']]
+
     losses = []
     for tr in trials:
         loss = tr['result'].get('validation_stats', [(0,np.inf, 0, 0)])[-1][1]
