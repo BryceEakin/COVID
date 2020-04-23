@@ -216,11 +216,11 @@ async def get_current_best(request, n=0):
         <div class="col-md-12 mb-4 mt-4 text-center">
         {make_button(f"/status", "server", text="Job Status")}
         <br><br>
-        {make_button(f"/best-trials/0{'' if not all_gens else '?allgens='}", "fast-backward", n==0)}
-        {make_button(f"/best-trials/{n-1}{'' if not all_gens else '?allgens='}", "chevron-left", n == 0)}
-        {make_button(f"/best-trials/{n}?refresh=True{'' if not all_gens else '&allgens='}", "refresh")}
-        {make_button(f"/best-trials/{n+1}{'' if not all_gens else '?allgens='}", "chevron-right", n == max_idx)}
-        {make_button(f"/best-trials/{max_idx}{'' if not all_gens else '?allgens='}", "fast-forward", n == max_idx)}
+        {make_button(f"/best-trials/0{'' if not all_gens else '?allgens=t'}", "fast-backward", n==0)}
+        {make_button(f"/best-trials/{n-1}{'' if not all_gens else '?allgens=t'}", "chevron-left", n == 0)}
+        {make_button(f"/best-trials/{n}?refresh=True{'' if not all_gens else '&allgens=t'}", "refresh")}
+        {make_button(f"/best-trials/{n+1}{'' if not all_gens else '?allgens=t'}", "chevron-right", n == max_idx)}
+        {make_button(f"/best-trials/{max_idx}{'' if not all_gens else '?allgens=t'}", "fast-forward", n == max_idx)}
         </div>
         <br>
         <table class="table table-striped table-sm w-auto ml-1">
