@@ -23,7 +23,7 @@ from covid.utils import getch
 # List of depth, budget pairs
 LEVEL_DEFS = [
     (1,90),
-    (2,50),
+    (2,40),
     (3,50),
     (4,40),
     (5,30),
@@ -276,6 +276,11 @@ def create_suggestion_box(docs):
 #     return trials.new_trial_docs([])
 def run_optimization(level=1):
     print(f"Optimizing at level {level}")
+
+    next_lvl_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=f'covid-{level+1}')
+    if len(next_lvl_trials.trials) > 0:
+        print(f"Already completed level {level} -- skipping")
+        return
 
     exp_key = f'covid-{level}'
 
