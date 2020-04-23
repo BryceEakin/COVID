@@ -54,6 +54,8 @@ SEARCH_SPACE = {
             ['relu', 'silu', 'tanh', 'leaky_relu', 'elu']),
     }
 
+NUM_NODES = 6
+
 def make_json_friendly(result):
     if isinstance(result, list):
         return make_json_list_friendly(result)
@@ -166,8 +168,10 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
     else:
         slope, intercept, _, _, _ = linregress(v_x[-5:], vloss[-5:])
 
+    loss = min(vloss[-1], intercept + slope * (v_x[-1] + 1.0))
+
     result = make_json_friendly({
-        'loss': intercept + slope * (v_x[-1] + 1.0),
+        'loss': loss,
         'runtime': runtime.total_seconds(),
         'status': status,
         'label': label,
@@ -193,7 +197,7 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         v_x, vloss, _, _ = zip(*trial['result']['validation_stats'])
 
         slope, intercept, _, _, _ = linregress(v_x[-5:], vloss[-5:])
-        forward_losses.append(0.5 * (loss + intercept + slope * depth))
+        forward_losses.append(min(0.5 * (loss + intercept + slope * depth), loss))
 
     ordered_idxs = np.argsort([x if x is not None else np.inf for x in forward_losses])
 
@@ -288,7 +292,9 @@ def run_optimization(level=1):
         last_depth, _ = LEVEL_DEFS[level-2]
         
         num_to_extend = int(np.ceil(budget/2/(depth-last_depth)))
-        num_new = int(np.ceil(budget/2/depth))
+
+        # Minimum one per node for the expensive ones -- no point wasting compute time
+        num_new = int(np.ceil((budget/2/depth)/NUM_NODES)*NUM_NODES)
 
         if len(trials.trials) == 0:
             print("Generating estimates from previous level")
