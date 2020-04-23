@@ -7,7 +7,7 @@ import shutil
 import string
 import threading
 import time
-from collections import Iterable, Mapping
+from collections import Iterable, Mapping, defaultdict
 from datetime import datetime, timedelta
 
 import hyperopt
@@ -165,10 +165,12 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
 
     if num_epochs == 1:
         slope, intercept, _, _, _ = linregress(v_x[-3:], vloss[-3:])
-    else:
+    elif num_epochs == 2:
         slope, intercept, _, _, _ = linregress(v_x[-5:], vloss[-5:])
+    else:
+        slope, intercept, _, _, _ = linregress(v_x[-8:], vloss[-8:])
 
-    loss = min(vloss[-1], intercept + slope * (v_x[-1] + 1.0))
+    loss = min(vloss[-1], intercept + slope * num_epochs)
 
     result = make_json_friendly({
         'loss': loss,
@@ -188,6 +190,8 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
     all_trials = MongoTrials('mongo://localhost:1234/covid/jobs')
     dest_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=new_exp_key)
 
+    hist_length = {2:3, 3:5, 4:8}.get(depth, 10)
+
     forward_losses = []
     for trial, loss in zip(src_trials.trials, src_trials.losses()):
         if loss is None:
@@ -196,7 +200,7 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
 
         v_x, vloss, _, _ = zip(*trial['result']['validation_stats'])
 
-        slope, intercept, _, _, _ = linregress(v_x[-5:], vloss[-5:])
+        slope, intercept, _, _, _ = linregress(v_x[-hist_length:], vloss[-hist_length:])
         forward_losses.append(min(0.5 * (loss + intercept + slope * depth), loss))
 
     ordered_idxs = np.argsort([x if x is not None else np.inf for x in forward_losses])
