@@ -168,7 +168,10 @@ async def get_current_best(request, n=0):
     trials = list(TRIALS.trials)
     trials.sort(key=lambda x: x['exp_key'], reverse=True)
 
-    if 'allgens' not in request.args:
+    if 'allgens' in request.args:
+        all_gens = True
+    else:
+        all_gens = False
         trials = [x for x in trials if x['exp_key'] == trials[0]['exp_key']]
 
     losses = []
@@ -213,11 +216,11 @@ async def get_current_best(request, n=0):
         <div class="col-md-12 mb-4 mt-4 text-center">
         {make_button(f"/status", "server", text="Job Status")}
         <br><br>
-        {make_button(f"/best-trials/0", "fast-backward", n==0)}
-        {make_button(f"/best-trials/{n-1}", "chevron-left", n == 0)}
-        {make_button(f"/best-trials/{n}?refresh=True", "refresh")}
-        {make_button(f"/best-trials/{n+1}", "chevron-right", n == max_idx)}
-        {make_button(f"/best-trials/{max_idx}", "fast-forward", n == max_idx)}
+        {make_button(f"/best-trials/0{'' if not all_gens else '?allgens='}", "fast-backward", n==0)}
+        {make_button(f"/best-trials/{n-1}{'' if not all_gens else '?allgens='}", "chevron-left", n == 0)}
+        {make_button(f"/best-trials/{n}?refresh=True{'' if not all_gens else '&allgens='}", "refresh")}
+        {make_button(f"/best-trials/{n+1}{'' if not all_gens else '?allgens='}", "chevron-right", n == max_idx)}
+        {make_button(f"/best-trials/{max_idx}{'' if not all_gens else '?allgens='}", "fast-forward", n == max_idx)}
         </div>
         <br>
         <table class="table table-striped table-sm w-auto ml-1">
