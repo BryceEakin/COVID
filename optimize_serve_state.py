@@ -18,6 +18,7 @@ from covid.constants import MODE_NAMES
 
 import hyperopt
 from hyperopt import hp
+import hashlib
 
 from collections import Counter, defaultdict
 
@@ -196,6 +197,11 @@ async def get_current_best(request, n=0):
 
     params = hyperopt.space_eval(SEARCH_SPACE, {k:v[0] for k,v in tr['misc'].get('vals',{}).items()})
 
+    hsh = hashlib.sha1('hyperopt'.encode())
+    hsh.update(repr(sorted(params.items())).encode())
+
+    label = 'hyperopt_' + hsh.hexdigest()[:12]
+
     return html(f"""
         <html>
         <head><meta name="viewport" content="width=device-width, initial-scale=1"/></head>
@@ -203,7 +209,7 @@ async def get_current_best(request, n=0):
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
         <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
         <div>
-        <h3>Run Details</h3>
+        <h3>Run Details: #{n}/{max_idx}</h3>
         <div class="col-md-12 mb-4 mt-4 text-center">
         {make_button(f"/status", "server", text="Job Status")}
         <br><br>
@@ -217,6 +223,8 @@ async def get_current_best(request, n=0):
         <table class="table table-striped table-sm w-auto ml-1">
         <tbody>
         <tr><th>Pass</th><td>{tr["exp_key"]}</td></tr>
+        <tr><th>Label</th><td>{label}</td></tr>
+        <tr><th>Task ID</th><td>{tr['tid']}</td></tr>
         <tr><th>Raw Loss</th><td>{tr['result'].get('validation_stats', [(0,np.inf, 0, 0)])[-1][1]:0.4f}</td></tr>
         <tr><th>Adj Loss</th><td>{'{0:0.4f}'.format(tr['result'].get('loss',np.inf))}
         <tr><th>Epoch</th><td>{stats['epoch'][-1]:0.0f}</td></tr>
