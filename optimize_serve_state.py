@@ -167,7 +167,8 @@ async def get_current_best(request, n=0):
     trials = list(TRIALS.trials)
     trials.sort(key=lambda x: x['exp_key'], reverse=True)
 
-    trials = [x for x in trials if x['exp_key'] == trials[0]['exp_key']]
+    if 'allgens' not in request.args:
+        trials = [x for x in trials if x['exp_key'] == trials[0]['exp_key']]
 
     losses = []
     for tr in trials:
