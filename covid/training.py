@@ -4,6 +4,7 @@ import os
 import random
 import typing as typ
 from dataclasses import dataclass
+import dataclasses as dc
 from matplotlib import pyplot as plt
 
 import numpy as np
@@ -68,6 +69,11 @@ class CovidTrainingConfiguration():
     verbosity: int = logging.INFO
 
     device: str = 'cuda'
+
+    # Early Stopping
+    early_stop_milestones: typ.List[typ.Tuple[int,float]] = dc.field(
+        default_factory=lambda: [(1,0.3), (2,0.275), (3, 0.25), (5, 0.2)]
+    )
 
     # Dataset Configuration
     synthetic_negative_rate: float = 0.2
@@ -301,6 +307,17 @@ def train_model(config:CovidTrainingConfiguration,
         
         pct_epoch = 0
         model.train()
+        early_stop = False
+
+        for m_e, m_v in config.early_stop_milestones:
+            if m_e <= epoch and all(v[1] > m_v for v in validation_stats):
+                logging.info(f"Failed to meet early stopping milestone ({m_e}, {m_v}) -- stopping")
+                early_stop = True
+                break
+
+        if optim.param_groups[0]['lr'] <= config.optim_minimum_lr + 1e-9 or early_stop:
+            logging.info("Stopping early")
+            break
 
         for idx, batch in enumerate(tqdm(dataloader, leave=False)):
 

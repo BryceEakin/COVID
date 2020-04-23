@@ -105,7 +105,7 @@ async def get_status(request):
 
     for t in TRIALS.trials:
         if 'training_loss_hist' in t['result'] and t['state'] == hyperopt.JOB_STATE_DONE:
-            epoch = int(t['result']['training_loss_hist'][-1][0])
+            epoch = int(t['result']['training_loss_hist'][-1][0] + 1e-8)
             if t['exp_key'] != f'covid-{epoch}':
                 counters[t['exp_key']][-1] += 1
             else:
@@ -176,7 +176,7 @@ async def get_current_best(request, n=0):
 
     losses = []
     for tr in trials:
-        loss = tr['result'].get('validation_stats', [(0,np.inf, 0, 0)])[-1][1]
+        loss = min(list(zip(*tr['result'].get('validation_stats', [(0,np.inf, 0, 0)])[1])))
         #loss = tr['result'].get('loss', np.inf)
         if tr['state'] != 2: # Not Done
             loss = np.inf
