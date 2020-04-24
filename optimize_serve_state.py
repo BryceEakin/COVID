@@ -105,7 +105,7 @@ async def get_status(request):
 
     for t in TRIALS.trials:
         if 'training_loss_hist' in t['result'] and t['state'] == hyperopt.JOB_STATE_DONE:
-            epoch = int(t['result'].get('training_loss_hist', [(-1,np.inf)])[-1][1] + 1e-8)
+            epoch = int(t['result'].get('training_loss_hist', [(-1,np.inf)])[-1][0] + 1e-8)
             if epoch == -1:
                 counters[t['exp_key']][hyperopt.JOB_STATE_RUNNING] += 1
             elif t['exp_key'] != f'covid-{epoch}':
