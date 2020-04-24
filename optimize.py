@@ -20,16 +20,16 @@ from scipy.stats import linregress
 from covid.training import CovidTrainingConfiguration, train_model
 from covid.utils import getch
 
-# List of (depth, budget, % New) thruples
+# List of (depth, budget, % New)  thruples
 LEVEL_DEFS = [
-    (1,90, 1.0),
-    (2,40, 1.0),
-    (3,50, 0.5),
-    (4,40, 0.5),
-    (5,30, 0.5),
-    (7,40, 0.5),
-    (10,50, 0.0),
-    (15,100, 0.0)
+    (1, 90, 1.0),
+    (2, 40, 1.0),
+    (3, 50, 0.5),
+    (4, 40, 0.5),
+    (5, 30, 0.5),
+    (7, 20, 0.0),
+    (10, 50, 0.0),
+    (15, 100, 0.0)
 ]
 
 SEARCH_SPACE = {
