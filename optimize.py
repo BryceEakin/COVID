@@ -163,14 +163,11 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
     
     v_x, vloss, _, _ = zip(*validation_stats)
 
-    if num_epochs == 1:
-        slope, intercept, _, _, _ = linregress(v_x[-3:], vloss[-3:])
-    elif num_epochs == 2:
-        slope, intercept, _, _, _ = linregress(v_x[-5:], vloss[-5:])
-    else:
-        slope, intercept, _, _, _ = linregress(v_x[-8:], vloss[-8:])
+    hist_length = {2:3, 3:5, 5:8}.get(num_epochs, 10)
 
-    loss = min(vloss[-1], intercept + slope * num_epochs)
+    slope, intercept, _, _, _ = linregress(v_x[-hist_length:], vloss[-hist_length:])
+
+    loss = min(vloss[-1], intercept + slope * (v_x[-1] + 1))
 
     result = make_json_friendly({
         'loss': loss,
@@ -190,7 +187,7 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
     all_trials = MongoTrials('mongo://localhost:1234/covid/jobs')
     dest_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=new_exp_key)
 
-    hist_length = {2:3, 3:5, 4:8}.get(depth, 10)
+    hist_length = {2:3, 3:5, 5:8}.get(depth, 10)
 
     forward_losses = []
     for trial, loss in zip(src_trials.trials, src_trials.losses()):
