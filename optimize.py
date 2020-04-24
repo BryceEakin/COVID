@@ -198,7 +198,7 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         v_x, vloss, _, _ = zip(*trial['result']['validation_stats'])
 
         slope, intercept, _, _, _ = linregress(v_x[-hist_length:], vloss[-hist_length:])
-        forward_losses.append(min(0.5 * (loss + intercept + slope * depth), loss))
+        forward_losses.append(min(0.5 * (loss + intercept + slope * v_x[-1] + slope * (1-0.8**(depth-v_x[-1]))/(1-0.8)), loss))
 
     ordered_idxs = np.argsort([x if x is not None else np.inf for x in forward_losses])
 
