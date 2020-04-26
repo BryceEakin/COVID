@@ -62,7 +62,7 @@ class CovidTrainingConfiguration():
     # Global config
     root_folder: str = '.'
     random_seed: int = 4
-    batch_size: int = 24
+    batch_size: int = 32
     training_fold: typ.Union[int, None] = 9
     max_epochs: int = 100
     validation_frequency: float = 0.2

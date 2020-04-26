@@ -140,7 +140,7 @@ def create_dataloader(data, batch_size, sample_size=None, neg_rate=0.2, **dl_kwa
     )
 
 
-def create_data_split(src_folder, 
+def _old_create_data_split(src_folder, 
                       dst_train_folder, 
                       dst_test_folder, 
                       pct_train=0.85, 
@@ -226,6 +226,141 @@ def create_data_split(src_folder,
     test_prot = {k:data.all_proteins[k] for k in test_data['item_id_b'].unique()}
 
     train_data = all_data.loc[~(is_selected | to_exclude)]
+    train_chem = {k:data.all_chemicals[k] for k in train_data['item_id_a'].unique()}
+    train_prot = {k:data.all_proteins[k] for k in train_data['item_id_b'].unique()}
+    
+    assert len(set(train_prot.keys()).intersection(test_prot.keys())) == 0
+    assert len(set(train_chem.keys()).intersection(test_chem.keys())) == 0
+    
+    if not os.path.exists(dst_train_folder):
+        os.mkdir(dst_train_folder)
+        
+    train_data.to_csv(os.path.join(dst_train_folder, 'stitch_preprocessed.csv.gz'), index=False)
+    with gzip.open(os.path.join(dst_train_folder, 'stitch_proteins.pkl.gz'), 'wb') as f:
+        pkl.dump(train_prot, f, pkl.HIGHEST_PROTOCOL)
+    with gzip.open(os.path.join(dst_train_folder, 'stitch_chemicals.pkl.gz'), 'wb') as f:
+        pkl.dump(train_chem, f, pkl.HIGHEST_PROTOCOL)
+        
+    if not os.path.exists(dst_test_folder):
+        os.mkdir(dst_test_folder)
+        
+    test_data.to_csv(os.path.join(dst_test_folder, 'stitch_preprocessed.csv.gz'), index=False)
+    with gzip.open(os.path.join(dst_test_folder, 'stitch_proteins.pkl.gz'), 'wb') as f:
+        pkl.dump(test_prot, f, pkl.HIGHEST_PROTOCOL)
+    with gzip.open(os.path.join(dst_test_folder, 'stitch_chemicals.pkl.gz'), 'wb') as f:
+        pkl.dump(test_chem, f, pkl.HIGHEST_PROTOCOL)
+
+def _update_data_subset(add_to_data, item_data, excl_proteins, incl_proteins, max_num_per_item):
+    item_data = item_data.loc[~item_data['item_id_b'].isin(excl_proteins)]
+    c_drop = 0
+    if item_data.shape[0] > max_num_per_item:
+        c_drop = item_data.shape[0] - max_num_per_item
+        item_data = item_data.sample(n=max_num_per_item)
+    incl_proteins.update(item_data['item_id_b'].values)
+    if add_to_data is None:
+        return item_data, c_drop
+    return add_to_data.append(item_data), c_drop
+
+def create_data_split(src_folder, 
+                      dst_train_folder, 
+                      dst_test_folder, 
+                      pct_train=0.875, 
+                      tolerance = 0.025, 
+                      max_to_drop = 0.2, 
+                      max_per_item=0.0025):
+    data = StitchDataset(src_folder)
+    data._deferred_load()
+    logging.debug(f"Creating {pct_train} data split - {dst_train_folder} ; {dst_test_folder}")
+
+    while True:
+        all_data = data.all_data.copy()
+        max_num_per_item = int(max_per_item * all_data.shape[0])
+
+        train_data = None
+        test_data = None
+
+        train_proteins = set()
+        test_proteins = set()
+
+        dropped_for_concentration = 0
+
+        def add_to_train(item_data):
+            nonlocal train_data, train_proteins, test_proteins, max_num_per_item, dropped_for_concentration
+            train_data, c_drop = _update_data_subset(
+                train_data, item_data, test_proteins, train_proteins, max_num_per_item
+            )
+            dropped_for_concentration += c_drop
+
+        def add_to_test(item_data):
+            nonlocal test_data, train_proteins, test_proteins, max_num_per_item, dropped_for_concentration
+            test_data, c_drop = _update_data_subset(
+                test_data, item_data, train_proteins, test_proteins, max_num_per_item
+            )
+            dropped_for_concentration += c_drop
+
+        def pct_in_training():
+            nonlocal train_data, test_data
+            if test_data is None:
+                return 1.0
+            return train_data.shape[0] / (train_data.shape[0] + test_data.shape[0])
+
+        chems_to_assign = list(data.all_chemicals.keys())
+        random.shuffle(chems_to_assign)
+
+        while chems_to_assign:
+            item = chems_to_assign.pop(0)
+            print(f"#{len(chems_to_assign)} - {item}                ", end='\r')
+
+            item_data = all_data.loc[all_data['item_id_a'] == item]
+            all_data.drop(item_data.index, axis=0, inplace=True)
+
+            pct_in_train = item_data['item_id_b'].isin(train_proteins).mean()
+            pct_in_test = item_data['item_id_b'].isin(test_proteins).mean()
+
+            if pct_in_test >= max_to_drop and pct_in_training() > (pct_train-tolerance):
+                add_to_test(item_data)
+            
+            elif pct_in_train >= max_to_drop:
+                add_to_train(item_data)
+            
+            elif train_data is None or pct_in_training() < (pct_train-tolerance):
+                add_to_train(item_data)
+
+            elif test_data is None or pct_in_training() > (pct_train+tolerance):
+                add_to_test(item_data)
+
+            elif random.random() < pct_train:
+                add_to_train(item_data)
+            
+            else:
+                add_to_test(item_data)
+                
+        num_dropped = (
+            data.all_data.shape[0] 
+            - train_data.shape[0] 
+            - test_data.shape[0]
+            - dropped_for_concentration
+        )
+
+        if num_dropped / data.all_data.shape[0] > max_to_drop:
+            logging.debug(f"Percent to drop outside of tolerance ({num_dropped / len(data):0.2%}) -- retrying")
+            continue
+
+        if pct_train - tolerance < pct_in_training() < pct_train + tolerance:
+            break
+
+        logging.debug(f"Test set outside of tolerance -- {1-pct_in_training():0.3%} -- retrying...")
+
+
+    logging.debug(
+        f"Test set selected -- {1-pct_in_training():0.3%} "
+        + f"(dropping {num_dropped/len(data):0.3%}, "
+        + f"truncated {dropped_for_concentration/len(data):0.3%})"
+    )
+    
+    test_chem = {k:data.all_chemicals[k] for k in test_data['item_id_a'].unique()}
+    test_prot = {k:data.all_proteins[k] for k in test_data['item_id_b'].unique()}
+
     train_chem = {k:data.all_chemicals[k] for k in train_data['item_id_a'].unique()}
     train_prot = {k:data.all_proteins[k] for k in train_data['item_id_b'].unique()}
     

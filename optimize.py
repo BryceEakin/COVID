@@ -209,7 +209,7 @@ def configure_next_level(lvl:int, depth:int, budget:int=50):
     result_docs = []
 
     while len(ordered_idxs) > 0:
-        idx = ordered_idxs.pop[0]
+        idx = ordered_idxs.pop(0)
         if src_trials.losses()[idx] is None:
             continue
 
