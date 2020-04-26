@@ -22,12 +22,12 @@ from covid.utils import getch
 
 # List of (depth, budget, % New)  thruples
 LEVEL_DEFS = [
-    (1, 90, 1.0),
-    (2, 40, 1.0),
-    (3, 50, 0.5),
-    (4, 40, 0.5),
-    (5, 30, 0.5),
-    (7, 20, 0.0),
+    (1, 200, 1.0),
+    (2, 200, 0.5),
+    (3, 100, 0.5),
+    (4, 50, 0.5),
+    (5, 50, 0.5),
+    (7, 50, 0.0),
     (10, 50, 0.0),
     (15, 100, 0.0),
     (20, 100, 0.0)
@@ -35,7 +35,7 @@ LEVEL_DEFS = [
 
 SEARCH_SPACE = {
         'synthetic_negative_rate': hp.uniform('neg_rate', 0,1),
-        'optim_initial_lr': 10 ** -hp.quniform('lr_exp', 2, 5, 0.25),
+        'optim_initial_lr': 10 ** -hp.quniform('lr_exp', 3, 6, 0.25),
         'adam_beta1': 1-hp.loguniform('inv_beta1', -5, -1),
         'adam_beta2': 1-hp.loguniform('inv_beta2', -8, -2),
         'optim_adam_eps': hp.loguniform('eps', -15, 0),
@@ -181,7 +181,7 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
     return result
 
 
-def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
+def configure_next_level(lvl:int, depth:int, budget:int=50):
     new_exp_key = f'covid-{lvl}'
 
     src_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=f'covid-{lvl-1}')
@@ -201,27 +201,32 @@ def configure_next_level(lvl:int, depth:int, num_suggestions:int=20):
         slope, intercept, _, _, _ = linregress(v_x[-hist_length:], vloss[-hist_length:])
         forward_losses.append(min(0.5 * (loss + intercept + slope * v_x[-1] + slope * (1-0.8**(depth-v_x[-1]))/(1-0.8)), loss))
 
-    ordered_idxs = np.argsort([x if x is not None else np.inf for x in forward_losses])
+    ordered_idxs = list(np.argsort([x if x is not None else np.inf for x in forward_losses]))
 
     last_tid = 0 if len(all_trials.tids) == 0 else max(all_trials.tids)
     available_tids = []
     
     result_docs = []
 
-    for idx in ordered_idxs[:num_suggestions]:
+    while len(ordered_idxs) > 0:
+        idx = ordered_idxs.pop[0]
         if src_trials.losses()[idx] is None:
             continue
 
-        if len(available_tids) == 0:
-            available_tids = dest_trials.new_trial_ids(last_tid)
-
+        epochs_completed = src_trials.trials[idx]['result'].get('training_loss_hist', [(0,np.inf)])[-1][0]
+        
         spec = None
         result = {'status': 'new'}
         misc = copy.deepcopy(src_trials.trials[idx]['misc'])
         
         result_docs.append((spec, result, misc))
+        budget -= (depth - epochs_completed)
+        if budget <= 0:
+            break
 
-    for idx in ordered_idxs[num_suggestions:]:
+    while len(ordered_idxs) > 0:
+        idx = ordered_idxs.pop()
+
         if src_trials.losses()[idx] is None:
             continue
 
@@ -298,14 +303,15 @@ def run_optimization(level=1):
         depth, budget, pct_new = LEVEL_DEFS[level-1]
         last_depth, _, _ = LEVEL_DEFS[level-2]
         
-        num_to_extend = int(np.ceil((1-pct_new)*budget/(depth - last_depth)))
+        extend_budget = (1-pct_new) * budget
 
         # Minimum one per node for the expensive ones -- no point wasting compute time
         num_new = int(np.ceil((pct_new*budget/depth)/NUM_NODES)*NUM_NODES)
 
         if len(trials.trials) == 0:
             print("Generating estimates from previous level")
-            result_docs = configure_next_level(level, depth, num_to_extend)
+            result_docs = configure_next_level(level, depth, extend_budget)
+            num_to_extend = len(result_docs)
 
             suggestion_box = create_suggestion_box(result_docs)
         

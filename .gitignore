@@ -140,4 +140,5 @@ training_state/
 logs/
 training_state/
 *.csv.gz
+*.pkl
 outputs/
