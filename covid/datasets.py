@@ -140,13 +140,35 @@ def create_dataloader(data, batch_size, sample_size=None, neg_rate=0.2, **dl_kwa
     )
 
 
-def create_data_split(src_folder, dst_train_folder, dst_test_folder, pct_train=0.9, tolerance = 0.01):
+def create_data_split(src_folder, 
+                      dst_train_folder, 
+                      dst_test_folder, 
+                      pct_train=0.85, 
+                      tolerance = 0.025, 
+                      max_to_drop = 0.2, 
+                      max_per_item=0.0025):
     data = StitchDataset(src_folder)
     data._deferred_load()
-    logging.debug(f"Creating {pct_train} data split - {dst_test_folder}")
-    
+    logging.debug(f"Creating {pct_train} data split - {dst_train_folder} ; {dst_test_folder}")
+
     while True:
-        is_selected = pd.Series(False, index=data.all_data.index)
+        all_data = data.all_data.copy()
+        max_num_per_item = int(max_per_item * all_data.shape[0])
+
+        # Make sure no element in the data is overwhelmingly present
+        # Limit by chemical first
+        all_data = all_data.groupby('item_id_a').apply(
+            lambda x: x.sample(min(x.shape[0], max_num_per_item), replace=False)
+        ).reset_index(drop=True)
+
+        # Then by protein
+        all_data = all_data.groupby('item_id_b').apply(
+            lambda x: x.sample(min(x.shape[0], max_num_per_item), replace=False)
+        ).reset_index(drop=True)
+
+        logging.debug(f"{all_data.shape[0]}/{data.all_data.shape[0]} items remaining after max concentration filter")
+
+        is_selected = pd.Series(False, index=all_data.index)
 
         protein_to_select = list(data.all_proteins.keys())
         random.shuffle(protein_to_select)
@@ -154,40 +176,61 @@ def create_data_split(src_folder, dst_train_folder, dst_test_folder, pct_train=0
         have_selected = set()
         num_selected = 0
 
-        while num_selected/is_selected.shape[0] < (1-pct_train) and len(protein_to_select) > 0:
+        while num_selected/is_selected.shape[0] < (1-pct_train) - tolerance and len(protein_to_select) > 0:
             prot = protein_to_select.pop(0)
             items_to_select = [prot]
-            while items_to_select:
+            while items_to_select and num_selected/is_selected.shape[0] <= (1-pct_train) - tolerance:
                 item = items_to_select.pop(0)
+                print(f"#{len(have_selected)} ({num_selected/is_selected.shape[0]:0.2%}) - {item}                ", end='\r')
                 
                 have_selected.add(item)
                 new_selections = (
-                    (data.all_data['item_id_b'] == item)
-                    #| (data.all_data['item_id_b'] == item)
+                    (all_data['item_id_b'] == item)
+                    | (all_data['item_id_a'] == item)
                 )
-                new_data = data.all_data.loc[new_selections]
+                new_data = all_data.loc[new_selections]
+                will_add = set(new_data['item_id_b'].values).union(
+                    set(new_data['item_id_a'].values)
+                ).difference(have_selected)
+
+                if (is_selected | new_selections).mean() > (1-pct_train) + tolerance:
+                    continue
+
                 items_to_select.extend(
                     set(new_data['item_id_b'].values).union(
-                        set() #new_data['item_id_b'].values
+                        set(new_data['item_id_a'].values)
                     ).difference(have_selected)
                 )
                 is_selected = is_selected | new_selections
-                num_selected += new_data.shape[0]
+                num_selected = is_selected.sum()
+
+        test_data = all_data.loc[is_selected]
+
+        to_exclude = (
+            (all_data['item_id_a'].isin(test_data['item_id_a'].unique()))
+            | (all_data['item_id_b'].isin(test_data['item_id_b'].unique()))
+        )
+        
+        if (to_exclude & ~is_selected).mean() > max_to_drop:
+            logging.debug(f"Percent to drop outside of tolerance ({(to_exclude & ~is_selected).mean()}) -- retrying...")
+            continue
 
         if is_selected.mean() <= (1-pct_train) + tolerance:
             break
         
         logging.debug(f"Test set outside of tolerance -- {is_selected.mean():0.3%} -- retrying...")
+
+    logging.debug(f"Test set selected -- {is_selected.mean():0.3%} (dropping {(to_exclude & ~is_selected).mean():0.3%})")
     
-    logging.debug(f"Test set selected -- {is_selected.mean():0.3%}")
-    
-    train_data = data.all_data.loc[~is_selected]
+    test_chem = {k:data.all_chemicals[k] for k in test_data['item_id_a'].unique()}
+    test_prot = {k:data.all_proteins[k] for k in test_data['item_id_b'].unique()}
+
+    train_data = all_data.loc[~(is_selected | to_exclude)]
     train_chem = {k:data.all_chemicals[k] for k in train_data['item_id_a'].unique()}
     train_prot = {k:data.all_proteins[k] for k in train_data['item_id_b'].unique()}
     
-    test_data = data.all_data.loc[is_selected]
-    test_chem = {k:data.all_chemicals[k] for k in test_data['item_id_a'].unique()}
-    test_prot = {k:data.all_proteins[k] for k in test_data['item_id_b'].unique()}
+    assert len(set(train_prot.keys()).intersection(test_prot.keys())) == 0
+    assert len(set(train_chem.keys()).intersection(test_chem.keys())) == 0
     
     if not os.path.exists(dst_train_folder):
         os.mkdir(dst_train_folder)

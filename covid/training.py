@@ -63,7 +63,7 @@ class CovidTrainingConfiguration():
     root_folder: str = '.'
     random_seed: int = 4
     batch_size: int = 24
-    training_fold: typ.Union[int, None] = 0
+    training_fold: typ.Union[int, None] = 9
     max_epochs: int = 100
     validation_frequency: float = 0.2
     verbosity: int = logging.INFO
@@ -73,7 +73,7 @@ class CovidTrainingConfiguration():
     # Early Stopping
     early_stop_min_epochs: int=2
     early_stop_milestones: typ.List[typ.Tuple[int,float]] = dc.field(
-        default_factory=lambda: [(1,0.3), (2,0.275), (3, 0.25), (5, 0.2)]
+        default_factory=lambda: [] # [(1,0.3), (2,0.275), (3, 0.25), (5, 0.2)]
     )
 
     # Dataset Configuration
@@ -178,7 +178,7 @@ def _create_optimizer_and_schedulers(model, config):
     return optim, warmup, scheduler
 
 
-def _create_dataloaders(config):
+def _create_dataloaders(config, validation_synth_neg_rate = 0.0):
     logging.debug("Initializing Datasets")
     data = StitchDataset(os.path.join(config.root_folder, f'data/train_{config.training_fold:02}'))
     dataloader = create_dataloader(
@@ -194,7 +194,7 @@ def _create_dataloaders(config):
         validation_data, 
         config.batch_size, 
         drop_last=True,
-        neg_rate=0.0, 
+        neg_rate=validation_synth_neg_rate, 
         num_workers=config.dataloader_num_workers
     )
 

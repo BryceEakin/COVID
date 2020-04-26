@@ -54,7 +54,7 @@ def plot_loss(ax, loss_x, loss_y, valid_x, valid_y, period=None):
 
     ax.plot((x[0], x[-1]), (0.422, 0.422), c='g', ls=':', lw=1.5, label='random baseline')
     ax.legend()
-    ax.set_ylim((0.0, 0.5))
+    ax.set_ylim((0.0, 0.6))
 
 def plot_stat(ax, x, stat, title, ylim=(0.0,1.0)):
     for i, name in enumerate(MODE_NAMES):

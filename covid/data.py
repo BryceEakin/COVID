@@ -102,6 +102,13 @@ class ProteinBatch(object):
             
         return ProteinBatch(new_data, other._batch_offsets, other._batch_lengths)
         
+    def _batchwise_apply(self, other, func):
+        raise NotImplementedError()
+        pieces = [
+            self.data[:,:,start:(start+length)]
+            for start, length in zip(self.batch_offsets, self.batch_lengths)
+        ]
+
     def __repr__(self):
         return f"<ProteinBatch[{len(self.batch_lengths)}]({self.data.shape}) offsets={self.batch_offsets}, lengths={self.batch_lengths}>"
         
@@ -110,6 +117,8 @@ class ProteinBatch(object):
             other = other.broadcast_like(self)
             return ProteinBatch(self.data + other.data, self.batch_offsets, self.batch_lengths)
         
+
+
         return ProteinBatch(self.data + other, self.batch_offsets, self.batch_lengths)
     
     def __sub__(self, other):
