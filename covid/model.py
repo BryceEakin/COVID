@@ -96,7 +96,7 @@ class ProteinHeadModel(nn.Module):
             apply_to_protein_batch(nn.Conv1d(23, base_dim * 4, (1, ), 1, 0)),
             apply_to_protein_batch(nn.Dropout(dropout)),
             
-            #Do some resnet
+            # Do some resnet
             resnet(base_dim * 4, base_dim, inner_kernel=3),
             resnet(base_dim * 4, base_dim, inner_kernel=5),
             apply_to_protein_batch(nn.Dropout(dropout)),
@@ -111,7 +111,25 @@ class ProteinHeadModel(nn.Module):
                             maxpool=True, 
                             for_protein_batch=True, 
                             nonlinearity=downscale_nonlinearity),
+            apply_to_protein_batch(nn.Dropout(dropout)),
+
+            # Do some resnet
+            resnet(base_dim * 8, base_dim * 2, inner_kernel=3),
+            resnet(base_dim * 8, base_dim * 2, inner_kernel=5),
+            
+            # Scale it down again
+            DownscaleConv1d(base_dim * 8, 
+                            base_dim * 16,
+                            4,
+                            maxpool=True, 
+                            for_protein_batch=True,
+                            nonlinearity=downscale_nonlinearity),
+            
+            apply_to_protein_batch(nn.Dropout(dropout)),
+
+            
         )
+            
 
     def forward(self, x):
         return self.module(x)
@@ -119,7 +137,7 @@ class ProteinHeadModel(nn.Module):
 
 class ProteinMiddleModel(nn.Module):
     def __init__(self, 
-                 base_dim=64,
+                 input_dim=512,
                  dropout=0.2,
                  nonlinearity='silu'):
         super().__init__()
@@ -128,16 +146,14 @@ class ProteinMiddleModel(nn.Module):
 
         self.model = nn.Sequential(
             #Do some resnet
-            resnet(base_dim * 8, base_dim * 2, inner_kernel=3),
-            resnet(base_dim * 8, base_dim * 2, inner_kernel=5),
-            resnet(base_dim * 8, base_dim * 2, inner_kernel=3),
-            resnet(base_dim * 8, base_dim * 2, inner_kernel=5),
+            resnet(input_dim, input_dim / 4, inner_kernel=3),
+            resnet(input_dim, input_dim / 4, inner_kernel=5),
+            resnet(input_dim, input_dim / 4, inner_kernel=3),
+            resnet(input_dim, input_dim / 4, inner_kernel=5),
         )
 
     def forward(self, context, x):
         pass
-
-        
 
 class ProteinTailModel(nn.Module):
     pass

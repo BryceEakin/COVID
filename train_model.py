@@ -16,7 +16,7 @@ if __name__ == '__main__':
     config = CovidTrainingConfiguration()
     config.verbosity = logging.DEBUG
 
-    config.training_fold = 9
+    config.training_fold = 0
     config.optim_adam_betas = (0.98, 0.9995)
     config.chem_hidden_size = 512
     config.chem_layers_per_message = 3

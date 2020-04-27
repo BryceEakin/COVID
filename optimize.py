@@ -23,7 +23,7 @@ from covid.utils import getch
 # List of (depth, budget, % New)  thruples
 LEVEL_DEFS = [
     (1, 100, 1.0),
-    (2, 200, 0.5),
+    (2, 100, 0.5),
     (3, 100, 0.5),
     (4, 50, 0.5),
     (5, 50, 0.5),
