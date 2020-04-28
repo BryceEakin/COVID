@@ -20,17 +20,17 @@ from scipy.stats import linregress
 from covid.training import CovidTrainingConfiguration, train_model
 from covid.utils import getch
 
-# List of (depth, budget, % New)  thruples
+# List of (depth, new_budget, extend_budget)  thruples
 LEVEL_DEFS = [
-    (1, 100, 1.0),
-    (2, 100, 0.5),
-    (3, 100, 0.5),
-    (4, 50, 0.5),
-    (5, 50, 0.5),
-    (7, 50, 0.0),
-    (10, 50, 0.0),
-    (15, 100, 0.0),
-    (20, 100, 0.0)
+    (1, 100, 0),
+    (2, 20, 30),
+    (3, 30, 20),
+    (4, 40, 20),
+    (5, 25, 20),
+    (7, 14, 36),
+    (10, 0, 48),
+    (15, 0, 100),
+    (20, 0, 100)
 ]
 
 SEARCH_SPACE = {
@@ -300,13 +300,11 @@ def run_optimization(level=1):
         depth = 1
 
     elif level > 1:
-        depth, budget, pct_new = LEVEL_DEFS[level-1]
+        depth, new_budget, extend_budget = LEVEL_DEFS[level-1]
         last_depth, _, _ = LEVEL_DEFS[level-2]
-        
-        extend_budget = (1-pct_new) * budget
 
         # Minimum one per node for the expensive ones -- no point wasting compute time
-        num_new = int(np.ceil((pct_new*budget/depth)/NUM_NODES)*NUM_NODES)
+        num_new = int(np.ceil((new_budget/depth)/NUM_NODES)*NUM_NODES)
 
         if len(trials.trials) == 0:
             print("Generating estimates from previous level")
