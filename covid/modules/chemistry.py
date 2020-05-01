@@ -239,7 +239,9 @@ class ChemicalMiddleModel(nn.Module):
     def forward(self, state, context):
         input, message, f_atoms, f_bonds, a2a, a2b, b2a, b2revb, a_scope = state
 
-        expanded_context = _build_expanded_context(context, a_scope)[b2a]
+        expanded_context = _build_expanded_context(context, a_scope)
+        if not self.atom_messages:
+            expanded_context = expanded_context[b2a]
 
         # Message passing
         for depth in range(self.depth - 1):
