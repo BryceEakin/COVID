@@ -45,10 +45,8 @@ SEARCH_SPACE = {
             'chem_nonlinearity',
             ['ReLU', 'LeakyReLU', 'tanh']),
         'chem_bias': hp.choice('chem_bias', [True, False]),
-        'chem_undirected': hp.choice('undirected', [
-            (True, {'chem_atom_messages': False}),
-            (False, {'chem_atom_messages': hp.choice('chem_atom_messages', [True, False])})
-        ]),
+        'chem_undirected': hp.choice('chem_undirected', [True, False]),
+        'chem_atom_messages': hp.choice('chem_atom_messages', [True, False]),
         'protein_base_dim': hp.quniform('protien_base_dim', 16,80,16),
         'protein_output_dim': hp.quniform('protein_out_dim', 64, 384, 64),
         'protein_nonlinearity': hp.choice(
@@ -148,13 +146,16 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
             os.remove(training_state_path)
         shutil.move(training_state_path + ".tmp", training_state_path)
 
-    losses, validation_stats = train_model(
-        config, 
-        run_name=label,
-        disable_training_resume=False, 
-        check_interrupted=check_interrupted, 
-        disable_checkpointing=True
-    )
+    try:
+        losses, validation_stats = train_model(
+            config, 
+            run_name=label,
+            disable_training_resume=False, 
+            check_interrupted=check_interrupted, 
+            disable_checkpointing=True
+        )
+    except Exception as ex:
+        return {'status': hyperopt.STATUS_ERROR, 'error': repr(ex)}
 
     try:
         with open(training_state_path, 'rb') as f:
