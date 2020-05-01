@@ -38,9 +38,10 @@ SEARCH_SPACE = {
             'chem_nonlinearity',
             ['ReLU', 'LeakyReLU', 'tanh']),
         'chem_bias': hp.choice('chem_bias', [True, False]),
-        'chem_undirected': hp.choice('chem_undirected', [True, False]),
-        'chem_atom_messages': hp.choice('chem_atom_messages', [True, False]),
-
+        'undirected': hp.choice('undirected', [
+            { 'chem_undirected':True, 'chem_atom_messages': False},
+            { 'chem_undirected':False, 'chem_atom_messages': hp.choice('chem_atom_messages', [True, False])}
+        ]),
         'protein_base_dim': hp.quniform('protien_base_dim', 16,80,16),
         'protein_output_dim': hp.quniform('protein_out_dim', 64, 384, 64),
         'protein_nonlinearity': hp.choice(

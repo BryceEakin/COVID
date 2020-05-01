@@ -217,6 +217,8 @@ class ChemicalMiddleModel(nn.Module):
         """
         super().__init__()
 
+        assert not (undirected and atom_messages), "Cannot have undirected atom messages -- sorry"
+
         self.dropout_layer = nn.Dropout(p=dropout)
         self.act_func = get_activation_function(activation)
 
