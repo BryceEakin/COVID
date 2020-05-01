@@ -12,7 +12,7 @@ import torch as T
 import gzip
 
 from .datasets import StitchDataset, create_data_split, create_dataloader
-from .model import (CovidModel, create_protein_model, run_model)
+from .model import (CovidModel, run_model)
 from .modules.chemistry import MPNEncoder
 from .schedulers import LinearWarmupScheduler
 from .reporting import get_performance_plots, calculate_average_loss_and_accuracy
@@ -81,9 +81,9 @@ class CovidTrainingConfiguration():
     dataloader_num_workers: int = 1
 
     # Optimizer Configuration
-    optim_initial_lr: float = 1e-3
-    optim_adam_betas: typ.Tuple[int, int] = (0.9, 0.999)
-    optim_adam_eps: float = 0.01
+    optim_initial_lr: float = 1e-5
+    optim_adam_betas: typ.Tuple[int, int] = (0.98, 0.995)
+    optim_adam_eps: float = 1e-5
     optim_warmup_override: typ.Union[None, int] = None # Applies 2/(1-Beta2) by default
 
     # LR Scheduler Configuration
@@ -93,15 +93,22 @@ class CovidTrainingConfiguration():
 
     # Model hyperparameters
     chem_layers_per_message: int = 2
-    chem_hidden_size: int = 300
+    chem_messages_per_pass: int = 2
+    chem_hidden_size: int = 128
+    chem_bias: bool = False
     chem_nonlinearity: str = 'ReLU'
+    chem_undirected: bool = False
+    chem_atom_messages: bool = False
 
-    protein_base_dim: int = 64
-    protein_output_dim: int = 600
+    protein_base_dim: int = 32
+    protein_output_dim: int = 256
     protein_nonlinearity: str = 'silu'
     protein_downscale_nonlinearity: str = 'tanh'
+    protein_maxpool: bool = True
 
     dropout_rate: float = 0.4
+    context_dim: int = 256
+    negotiation_passes: int = 3
     
 
 def _set_random_seeds(seed = 4):
@@ -131,25 +138,23 @@ def _create_all_data_splits(root):
 
 def _create_model(config):
     logging.debug("Creating model")
-    chem_model = MPNEncoder(
-        layers_per_message=config.chem_layers_per_message, 
-        hidden_size=config.chem_hidden_size,
-        dropout=config.dropout_rate,
-        activation=config.chem_nonlinearity
-    )
-    protein_model = create_protein_model(
-        dropout=config.dropout_rate,
-        outdim = config.protein_output_dim,
-        base_dim = config.protein_base_dim,
-        nonlinearity = config.protein_nonlinearity,
-        downscale_nonlinearity = config.protein_downscale_nonlinearity
-
-    )
     model = CovidModel(
-        chem_model, 
-        protein_model, 
-        in_dim=config.chem_hidden_size + config.protein_output_dim,
-        dropout=config.dropout_rate
+        config.dropout_rate,
+        config.chem_nonlinearity,
+        config.chem_hidden_size,
+        config.chem_bias,
+        config.chem_layers_per_message,
+        config.chem_undirected,
+        config.chem_atom_messages,
+        config.chem_messages_per_pass,
+        211,
+        config.protein_base_dim,
+        config.protein_output_dim,
+        config.protein_nonlinearity,
+        config.protein_downscale_nonlinearity,
+        config.protein_maxpool,
+        config.negotiation_passes,
+        config.context_dim
     )
     return model
 

@@ -28,31 +28,37 @@ LEVEL_DEFS = [
     (4, 40, 20),
     (5, 25, 20),
     (7, 14, 36),
-    (10, 0, 48),
-    (15, 0, 100),
-    (20, 0, 100)
+    (10, 100, 48)
 ]
 
 SEARCH_SPACE = {
-        'synthetic_negative_rate': hp.uniform('neg_rate', 0,1),
+        'synthetic_negative_rate': hp.uniform('neg_rate', 0, 0.5),
         'optim_initial_lr': 10 ** -hp.quniform('lr_exp', 3, 6, 0.25),
-        'adam_beta1': 1-hp.loguniform('inv_beta1', -5, -1),
-        'adam_beta2': 1-hp.loguniform('inv_beta2', -8, -2),
+        'adam_beta1': 1-hp.loguniform('inv_beta1', -6, -1),
+        'adam_beta2': 1-hp.loguniform('inv_beta2', -8, -4),
         'optim_adam_eps': hp.loguniform('eps', -15, 0),
-        'dropout_rate': hp.uniform('dropout_rate', 0.01, 0.8),
+        'dropout_rate': hp.uniform('dropout_rate', 0.05, 0.5),
         'chem_layers_per_message': hp.quniform('chem_layers_per_message', 1,4,1),
-        'chem_hidden_size': hp.quniform('chem_hidden_size', 64,512,64),
+        'chem_messages_per_pass': hp.quniform('chem_messages_per_pass', 1,4,1),
+        'chem_hidden_size': hp.quniform('chem_hidden_size', 64,384,64),
         'chem_nonlinearity': hp.choice(
             'chem_nonlinearity',
-            ['ReLU', 'LeakyReLU', 'tanh', 'ELU']),
-        'protein_base_dim': hp.quniform('protien_base_dim', 16,128,16),
+            ['ReLU', 'LeakyReLU', 'tanh']),
+        'chem_bias': hp.choice('chem_bias', [True, False]),
+        'chem_undirected': hp.choice('chem_undirected', [True, False]),
+        'chem_atom_messages': hp.choice('chem_atom_messages', [True, False]),
+
+        'protein_base_dim': hp.quniform('protien_base_dim', 16,80,16),
         'protein_output_dim': hp.quniform('protein_out_dim', 64, 384, 64),
         'protein_nonlinearity': hp.choice(
             'protein_nonlinearity', 
-            ['relu', 'silu', 'tanh', 'leaky_relu', 'elu']),
+            ['relu', 'silu', 'tanh']),
         'protein_downscale_nonlinearity': hp.choice(
             'protein_downscale_nonlinearity', 
-            ['relu', 'silu', 'tanh', 'leaky_relu', 'elu']),
+            ['relu', 'silu', 'tanh']),
+        'protein_maxpool': hp.choice('protein_maxpool', [True, False]),
+        'context_dim': hp.quniform('context_dim', 64, 512, 64),
+        'negotiation_passes': hp.quniform('negotiation_passes', 1, 8, 1)
     }
 
 NUM_NODES = 6

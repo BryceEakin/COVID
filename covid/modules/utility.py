@@ -33,5 +33,5 @@ class ResidualBlock(nn.Module):
         else:
             self._nonlinearity = NONLINEARITIES[nonlinearity]()
         
-    def forward(self, x):
-        return self._nonlinearity(x + self.model_layer(x))
+    def forward(self, x, *args, **kwargs):
+        return self._nonlinearity(x + self.model_layer(x, *args, **kwargs))

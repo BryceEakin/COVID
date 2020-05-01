@@ -3,6 +3,7 @@ from torch import nn
 import torch.nn.functional as F
 
 import typing as typ
+import numbers
 import numpy as np
 import math
 
@@ -39,8 +40,9 @@ def encode_protein(protein_str):
 
 def create_protein_batch(sequences: typ.List[T.Tensor], padding: int=5):
     batch_lengths = [x.shape[-1] for x in sequences]
-    batch_offsets = [0] + list(padding * (np.arange(len(sequences))+1) + np.cumsum(batch_lengths))[:-1]        
+    batch_offsets = [0] + list(padding * (np.arange(len(sequences))+1) + np.cumsum(batch_lengths))[:-1]
     data = T.cat([F.pad(x, (0, padding)) for x in sequences], -1)
+    
     if len(data.shape) == 2:
         data = data.unsqueeze(0)
         
@@ -103,44 +105,39 @@ class ProteinBatch(object):
         return ProteinBatch(new_data, other._batch_offsets, other._batch_lengths)
         
     def _batchwise_apply(self, other, func):
-        raise NotImplementedError()
         pieces = [
-            self.data[:,:,start:(start+length)]
-            for start, length in zip(self.batch_offsets, self.batch_lengths)
+            func(self.data[0,:,start:(start+length)], other[i])
+            for i, (start, length) in enumerate(zip(self.batch_offsets, self.batch_lengths))
         ]
+        return create_protein_batch(pieces)
+
+    def _operator(self, other, func):
+        if isinstance(other, ProteinBatch):
+            other = other.broadcast_like(self)
+            return ProteinBatch(func(self.data, other.data), self.batch_offsets, self.batch_lengths)
+        
+        if isinstance(other, numbers.Number) or isinstance(other, T.Tensor) and len(other.shape) < 3:
+            try:
+                return ProteinBatch(func(self.data + other), self.batch_offsets, self.batch_lengths)
+            except:
+                pass
+
+        return self._batchwise_apply(other, func)
 
     def __repr__(self):
         return f"<ProteinBatch[{len(self.batch_lengths)}]({self.data.shape}) offsets={self.batch_offsets}, lengths={self.batch_lengths}>"
         
     def __add__(self, other):
-        if isinstance(other, ProteinBatch):
-            other = other.broadcast_like(self)
-            return ProteinBatch(self.data + other.data, self.batch_offsets, self.batch_lengths)
-        
-
-
-        return ProteinBatch(self.data + other, self.batch_offsets, self.batch_lengths)
+        return self._operator(other, T.add)
     
     def __sub__(self, other):
-        if isinstance(other, ProteinBatch):
-            other = other.broadcast_like(self)
-            return ProteinBatch(self.data - other.data, self.batch_offsets, self.batch_lengths)
-        
-        return ProteinBatch(self.data - other, self.batch_offsets, self.batch_lengths)
+        return self._operator(other, T.sub)
     
     def __mul__(self, other):
-        if isinstance(other, ProteinBatch):
-            other = other.broadcast_like(self)
-            return ProteinBatch(self.data * other.data, self.batch_offsets, self.batch_lengths)
-        
-        return ProteinBatch(self.data * other, self.batch_offsets, self.batch_lengths)
+        return self._operator(other, T.mul)
     
     def __truediv__(self, other):
-        if isinstance(other, ProteinBatch):
-            other = other.broadcast_like(self)
-            return ProteinBatch(self.data / other.data, self.batch_offsets, self.batch_lengths)
-        
-        return ProteinBatch(self.data / other, self.batch_offsets, self.batch_lengths)
+        return self._operator(other, T.div)
     
     def __neg__(self, other):
         return ProteinBatch(-self.data, self.batch_offsets, self.batch_lengths)

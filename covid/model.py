@@ -1,49 +1,130 @@
-import torch as T
-from torch import nn
-import torch.nn.functional as F
-
-from .data import apply_to_protein_batch, ProteinBatchToPaddedBatch
-from .modules import create_resnet_block_1d, DownscaleConv1d, Squeeze
+import functools
 
 import numpy as np
-import functools
+import torch as T
+import torch.nn.functional as F
+from torch import nn
+
+from .data import ProteinBatchToPaddedBatch, apply_to_protein_batch
+from .modules import (NONLINEARITIES, create_chemical_models,
+                      create_protein_models)
+
+import logging
 
 __all__ = [
     "CovidModel",
     "RandomModel",
-    'create_protein_model',
     'run_model',
 ]
 
 class CovidModel(nn.Module):
-    def __init__(self, chem_model, protein_model, layers=2, dropout=0.0, in_dim=900, hidden_dim=512, out_dim=5):
+    def __init__(self,
+                 dropout:float = 0.2,
+                 chem_nonlinearity:str = 'ReLU',
+                 chem_hidden_size:int = 300,
+                 chem_bias:bool = True,
+                 chem_layers_per_message:int = 1,
+                 chem_undirected:bool = False,
+                 chem_atom_messages:bool = False,
+                 chem_messages_per_pass:int = 2,
+                 chem_mol_feature_dim:int = 211,
+                 protein_base_dim:int = 32,
+                 protein_output_dim:int = 256,
+                 protein_nonlinearity:str = 'silu',
+                 protein_downscale_nonlinearity:str = 'tanh',
+                 protein_maxpool:bool = True,
+                 negotiation_passes:int = 3,
+                 context_dim:int = 256,
+                 output_dim:int = 5
+                 ):
         super().__init__()
         
-        self.chem_model = chem_model
-        self.protein_model = protein_model
+        self.chem_head_model, self.chem_middle_model, self.chem_tail_model = create_chemical_models(
+            activation=chem_nonlinearity,
+            hidden_size=chem_hidden_size,
+            context_size=context_dim,
+            bias=chem_bias,
+            dropout=dropout,
+            layers_per_message=chem_layers_per_message,
+            undirected=chem_undirected,
+            atom_messages=chem_atom_messages,
+            messages_per_pass=chem_messages_per_pass
+        )
         
-        self.final_layers = nn.Sequential(*(
-            [
-                nn.Linear(in_dim, hidden_dim),
-                nn.ReLU(),
-                nn.Dropout(dropout),
-            ] + sum([[
-                nn.Linear(hidden_dim,hidden_dim),
-                nn.ReLU(),
-            ] for _ in range(layers-1)],[])
-            + [
-                nn.Dropout(dropout),
-                nn.Linear(hidden_dim,out_dim),
-                nn.Sigmoid()
-            ]
-        ))
+        raw_context_size = chem_mol_feature_dim + chem_hidden_size + protein_output_dim
+
+        self.context_model = nn.Sequential(
+            nn.Linear(raw_context_size, raw_context_size),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(raw_context_size, context_dim),
+            nn.Tanh()
+        )
+
+        (
+            self.protein_head_model,
+            self.protein_middle_model,
+            self.protein_tail_model
+        ) = create_protein_models(protein_base_dim,
+                                  context_dim,
+                                  protein_output_dim,
+                                  dropout,
+                                  protein_nonlinearity,
+                                  protein_downscale_nonlinearity,
+                                  protein_maxpool)
+
+        
+        self.final_layers = nn.Sequential(
+            nn.Linear(protein_output_dim + chem_hidden_size + chem_mol_feature_dim, context_dim * 2),
+            nn.ReLU(),
+            nn.Dropout(dropout),
+            nn.Linear(context_dim * 2, context_dim),
+            nn.ReLU(),
+            nn.Linear(context_dim, output_dim),
+            nn.Sigmoid()
+        )
+
+        self.num_passes = negotiation_passes
         
     def forward(self, chem_batch, chem_f_batch, protein_batch):
-        chem_out = self.chem_model(chem_batch, chem_f_batch)
-        protein_out = self.protein_model(protein_batch)
+        chem_state = self.chem_head_model(chem_batch)
+        protein_state = self.protein_head_model(protein_batch)
+
+        if (~T.isfinite(chem_f_batch)).any():
+            logging.debug("Encountered non-finite values in chem feature batch")
+            with T.no_grad():
+                chem_f_batch[~T.isfinite(chem_f_batch)] = 0.0
+
+        for i in range(self.num_passes + 1):
+            protein_context = self.protein_tail_model(protein_state)
+            chem_context = self.chem_tail_model(chem_state)
+
+            if (~T.isfinite(protein_context)).any():
+                logging.debug("Protein context invalid!")
+                with T.no_grad():
+                    protein_context[~T.isfinite(protein_context)] = 0.0
+
+            if (~T.isfinite(chem_context)).any():
+                logging.debug("Chemical context invalid!")
+                with T.no_grad():
+                    chem_context[~T.isfinite(chem_context)] = 0.0
+
+            context = T.cat((
+                chem_context,
+                chem_f_batch,
+                protein_context
+            ), -1)
+
+            if i == self.num_passes:
+                break
+
+            context = self.context_model(context)
+
+            chem_state = self.chem_middle_model(chem_state, context)
+            protein_state = self.protein_middle_model(protein_state, context)
         
-        result = self.final_layers(T.cat([chem_out, protein_out], -1))
-        return result
+
+        return self.final_layers(context)
 
 
 class RandomModel(nn.Module):
@@ -79,153 +160,3 @@ def run_model(model, batch, device):
 
     loss = F.binary_cross_entropy(result, target, weight=weights)
     return result, target, loss, weights
-
-class ProteinHeadModel(nn.Module):
-    def __init__(self,
-                 base_dim=64,
-                 dropout=0.2,
-                 nonlinearity='silu',
-                 downscale_nonlinearity='tanh',
-                 maxpool=True):
-        super().__init__()
-
-        resnet = functools.partial(create_resnet_block_1d, for_protein_batch=True, nonlinearity=nonlinearity)
-
-        self.module = nn.Sequential(
-            # 21->100 channels inplace convolution
-            apply_to_protein_batch(nn.Conv1d(23, base_dim * 4, (1, ), 1, 0)),
-            apply_to_protein_batch(nn.Dropout(dropout)),
-            
-            # Do some resnet
-            resnet(base_dim * 4, base_dim, inner_kernel=3),
-            resnet(base_dim * 4, base_dim, inner_kernel=5),
-            apply_to_protein_batch(nn.Dropout(dropout)),
-
-            resnet(base_dim * 4, base_dim, inner_kernel=7),
-            resnet(base_dim * 4, base_dim, inner_kernel=11),
-            
-            # Scale it down
-            DownscaleConv1d(base_dim * 4, 
-                            base_dim * 8, 
-                            4, 
-                            maxpool=True, 
-                            for_protein_batch=True, 
-                            nonlinearity=downscale_nonlinearity),
-            apply_to_protein_batch(nn.Dropout(dropout)),
-
-            # Do some resnet
-            resnet(base_dim * 8, base_dim * 2, inner_kernel=3),
-            resnet(base_dim * 8, base_dim * 2, inner_kernel=5),
-            
-            # Scale it down again
-            DownscaleConv1d(base_dim * 8, 
-                            base_dim * 16,
-                            4,
-                            maxpool=True, 
-                            for_protein_batch=True,
-                            nonlinearity=downscale_nonlinearity),
-            
-            apply_to_protein_batch(nn.Dropout(dropout)),
-
-            
-        )
-            
-
-    def forward(self, x):
-        return self.module(x)
-
-
-class ProteinMiddleModel(nn.Module):
-    def __init__(self, 
-                 input_dim=512,
-                 dropout=0.2,
-                 nonlinearity='silu'):
-        super().__init__()
-
-        resnet = functools.partial(create_resnet_block_1d, for_protein_batch=True, nonlinearity=nonlinearity)
-
-        self.model = nn.Sequential(
-            #Do some resnet
-            resnet(input_dim, input_dim / 4, inner_kernel=3),
-            resnet(input_dim, input_dim / 4, inner_kernel=5),
-            resnet(input_dim, input_dim / 4, inner_kernel=3),
-            resnet(input_dim, input_dim / 4, inner_kernel=5),
-        )
-
-    def forward(self, context, x):
-        pass
-
-class ProteinTailModel(nn.Module):
-    pass
-
-class ChemicalHeadModel(nn.Module):
-    pass
-
-class ChemicalMiddleModel(nn.Module):
-    pass
-
-class ChemicalTailModel(nn.Module):
-    pass
-
-
-def create_protein_model(dropout = 0.2, 
-                         outdim=600, 
-                         base_dim=64,
-                         nonlinearity='silu',
-                         downscale_nonlinearity='tanh',
-                         maxpool=True
-                        ):
-
-    resnet = functools.partial(create_resnet_block_1d, for_protein_batch=True, nonlinearity=nonlinearity)
-
-    return nn.Sequential(
-        # 21->100 channels inplace convolution
-        apply_to_protein_batch(nn.Conv1d(23, base_dim * 4, (1, ), 1, 0)),
-        apply_to_protein_batch(nn.Dropout(dropout)),
-        
-        #Do some resnet
-        resnet(base_dim * 4, base_dim, inner_kernel=3),
-        resnet(base_dim * 4, base_dim, inner_kernel=5),
-        apply_to_protein_batch(nn.Dropout(dropout)),
-
-        resnet(base_dim * 4, base_dim, inner_kernel=7),
-        resnet(base_dim * 4, base_dim, inner_kernel=11),
-        
-        # Scale it down
-        DownscaleConv1d(base_dim * 4, 
-                        base_dim * 8, 
-                        4, 
-                        maxpool=True, 
-                        for_protein_batch=True, 
-                        nonlinearity=downscale_nonlinearity),
-        apply_to_protein_batch(nn.Dropout(dropout)),
-        
-        #Do some resnet
-        resnet(base_dim * 8, base_dim * 2, inner_kernel=3),
-        resnet(base_dim * 8, base_dim * 2, inner_kernel=5),
-        
-        # Scale it down again
-        DownscaleConv1d(base_dim * 8, 
-                        base_dim * 16,
-                        4,
-                        maxpool=True, 
-                        for_protein_batch=True,
-                        nonlinearity=downscale_nonlinearity),
-        
-        # Final resneting
-        resnet(base_dim * 16, base_dim * 4, inner_kernel=7),
-        resnet(base_dim * 16, base_dim * 4, inner_kernel=3),
-        
-        apply_to_protein_batch(nn.MaxPool1d(100000, ceil_mode=True)),
-        
-        # Convert protein batch to standard batch format
-        ProteinBatchToPaddedBatch(),
-        
-        Squeeze(-1),
-        nn.Dropout(dropout),
-        nn.Linear(base_dim * 16, base_dim * 16),
-        nn.ReLU(),
-        nn.Linear(base_dim * 16, outdim),
-        #nn.Tanhshrink(),
-        #nn.Tanh(),
-    )
