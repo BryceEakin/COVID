@@ -100,7 +100,7 @@ class _ProteinMiddleModel(nn.Module):
         )
 
     def forward(self, state, context):
-        channel_reweighting = self.context_model(context)
+        channel_reweighting = T.tanh(self.context_model(context)) + 1.0
         
         # Reweight half of the channels to avoid vanishing gradients
         channel_reweighting = T.cat(

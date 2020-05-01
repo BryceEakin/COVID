@@ -27,6 +27,8 @@ def collate_stitch_data(list_of_samples):
     chem_features = T.stack(chem_features)
     proteins = create_protein_batch(proteins)
     results = T.stack(results)
+
+    chem_features[~T.isfinite(chem_features)] = 0.0
     
     return names, chem_graphs, chem_features, proteins, results
     
