@@ -155,7 +155,7 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
             disable_checkpointing=True
         )
     except Exception as ex:
-        return {'status': hyperopt.STATUS_ERROR, 'error': repr(ex)}
+        return {'status': hyperopt.STATUS_FAIL, 'error': repr(ex)}
 
     try:
         with open(training_state_path, 'rb') as f:
