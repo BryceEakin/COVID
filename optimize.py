@@ -45,8 +45,7 @@ SEARCH_SPACE = {
             'chem_nonlinearity',
             ['ReLU', 'LeakyReLU', 'tanh']),
         'chem_bias': hp.choice('chem_bias', [True, False]),
-        'chem_undirected': hp.choice('chem_undirected', [True, False]),
-        'chem_atom_messages': hp.choice('chem_atom_messages', [True, False]),
+        'chem_mode': hp.choice('chem_mode', ['atom', 'bond', 'bond-undirected']),
         'protein_base_dim': hp.quniform('protien_base_dim', 16,80,16),
         'protein_output_dim': hp.quniform('protein_out_dim', 64, 384, 64),
         'protein_nonlinearity': hp.choice(
@@ -120,6 +119,18 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
     config.optim_adam_betas = (params['adam_beta1'], params['adam_beta2'])
     del params['adam_beta1']
     del params['adam_beta2']
+    
+    if params['chem_mode'] == 'atom':
+        config.chem_atom_messages = True
+        config.chem_undirected = False
+    elif params['chem_mode'] == 'bond':
+        config.chem_atom_messages = False
+        config.chem_undirected = False
+    elif params['chem_mode'] == 'bond-undirected':
+        config.chem_atom_messages = False
+        config.chem_undirected = True
+        
+    del config['chem_mode']
 
     for key, val in params.items():
         if not hasattr(config, key):
