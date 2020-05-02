@@ -130,7 +130,7 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
         config.chem_atom_messages = False
         config.chem_undirected = True
         
-    del config['chem_mode']
+    del params['chem_mode']
 
     for key, val in params.items():
         if not hasattr(config, key):
