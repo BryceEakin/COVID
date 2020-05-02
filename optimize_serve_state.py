@@ -78,8 +78,8 @@ async def get_training_state(request, run_id):
         )
     raise NotFound("No state exists for that id")
         
-@app.get('/training-state/delete-all/yes-really')
-async def delete_all_yes_really(request, run_id):
+@app.get('/delete-all/yes-really')
+async def delete_all_yes_really(request):
     TRIALS.refresh()
     TRIALS.delete_all()
     TRIALS.refresh()
