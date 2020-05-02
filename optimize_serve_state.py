@@ -38,8 +38,7 @@ SEARCH_SPACE = {
             'chem_nonlinearity',
             ['ReLU', 'LeakyReLU', 'tanh']),
         'chem_bias': hp.choice('chem_bias', [True, False]),
-        'chem_undirected': hp.choice('chem_undirected', [True, False]),
-        'chem_atom_messages': hp.choice('chem_atom_messages', [True, False]),
+        'chem_mode': hp.choice('chem_mode', ['atom', 'bond', 'bond-undirected']),
         'protein_base_dim': hp.quniform('protien_base_dim', 16,80,16),
         'protein_output_dim': hp.quniform('protein_out_dim', 64, 384, 64),
         'protein_nonlinearity': hp.choice(
@@ -78,7 +77,13 @@ async def get_training_state(request, run_id):
             filename=f"{run_id}__state.pkl.gz"
         )
     raise NotFound("No state exists for that id")
-
+        
+@app.get('/training-state/delete-all/yes-really')
+async def delete_all_yes_really(request, run_id):
+    TRIALS.refresh()
+    TRIALS.delete_all()
+    TRIALS.refresh()
+    return redirect(f"/status")
 
 @app.put("/training-state/<run_id>", stream=True)
 async def put_training_state(request, run_id):
@@ -175,6 +180,9 @@ async def get_status(request):
 async def get_current_best(request, n=0):
     if 'refresh' in request.args:
         TRIALS.refresh()
+        
+    if len(TRIALS.trials) == 0:
+        redirect(f"/status")
     
     n = int(n)
 
