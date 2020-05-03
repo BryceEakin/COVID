@@ -157,6 +157,8 @@ def run_model(model, batch, device):
     target = (1.0*(target > 0)).to(device)
     
     result = model(chem_graphs, chem_features, proteins)
+    
+    result[(~T.isfinite(result))] = 0.5
 
     loss = F.binary_cross_entropy(result, target, weight=weights)
     return result, target, loss, weights
