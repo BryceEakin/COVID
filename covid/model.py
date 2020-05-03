@@ -158,7 +158,13 @@ def run_model(model, batch, device):
     
     result = model(chem_graphs, chem_features, proteins)
     
-    result[(~T.isfinite(result))] = 0.5
+    mask = T.ones_like(result, requires_grad=False)
+    mask[(~T.isfinite(result))] = 0
+    
+    incr = T.zeros_like(result, requires_grad=False)
+    incr[(~T.isfinite(result))] = 0.5
+    
+    result = result * mask + incr
 
     loss = F.binary_cross_entropy(result, target, weight=weights)
     return result, target, loss, weights
