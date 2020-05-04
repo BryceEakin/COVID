@@ -88,7 +88,7 @@ async def delete_failed(request):
         jobs.find_one_and_delete({'_id':obj['_id']})
     return redirect("/status")
 
-@app.get('/delete-gen/{gen}')
+@app.get('/delete-gen/<gen>')
 async def delete_gen(request, gen):
     gen_trials = MongoTrials('mongo://localhost:1234/covid/jobs', f'covid-{gen}')
     gen_trials.refresh()
