@@ -260,7 +260,7 @@ async def get_current_best(request):
         stats = get_performance_stats(tr['result']['validation_stats'])
     else:
         img = ''
-        stats = {}
+        stats = {'epoch':[0]}
         
     params = hyperopt.space_eval(SEARCH_SPACE, {k:v[0] for k,v in tr['misc'].get('vals',{}).items()})
 
