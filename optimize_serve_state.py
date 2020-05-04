@@ -246,7 +246,7 @@ async def trials_raw(request):
     if tr is None:
         return NotFound()
         
-    return json(tr)
+    return text(repr(tr))
 
 @app.get("/best-trials")
 async def get_current_best(request):
