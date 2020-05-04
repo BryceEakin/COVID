@@ -148,6 +148,7 @@ async def get_status(request):
         hyperopt.JOB_STATE_RUNNING,
         hyperopt.JOB_STATE_NEW
     ) and t['owner'] is not None]
+    
     queued = [t for t in TRIALS.trials if t['state'] == hyperopt.JOB_STATE_NEW and t not in running]
 
     return html(f"""
@@ -168,7 +169,7 @@ async def get_status(request):
         <thead class="thead-light">
         <th>Node</th><th>Generation</th><th>Id</th>
         </thead><tbody>
-        <tr>{'</tr><tr>'.join(f"<td>{t['owner'][0] if t['owner'] is not None else 'n/a'}</td><td>{t['exp_key']}</td><td>{t['tid']}</td>" for t in running)}</tr>
+        <tr>{'</tr><tr>'.join(f"<td>{t['owner'][0] if t['owner'] is not None else 'n/a'}</td><td>{t['exp_key']}</td><td><a href="/best-trials/?tid={t['tid']}">{t['tid']}</a></td>" for t in running)}</tr>
         </tbody></table>
         <h2>{len(queued)} items queued</h2>
         </body>
@@ -176,15 +177,24 @@ async def get_status(request):
     """)
 
 
-@app.get("/best-trials/<n:int>")
-async def get_current_best(request, n=0):
+@app.get("/best-trials")
+async def get_current_best(request):
+    n = request.args.get('n')
+    tid = request.args.get('tid')
+    label = request.args.get('label')
+    
+    if all(x is None for x in (n, tid, label)):
+        n = 0
+
     if 'refresh' in request.args:
         TRIALS.refresh()
         
     if len(TRIALS.trials) == 0:
         redirect(f"/status")
     
-    n = int(n)
+    tr = None
+    
+
 
     trials = list(TRIALS.trials)
     trials.sort(key=lambda x: x['exp_key'], reverse=True)
@@ -209,16 +219,49 @@ async def get_current_best(request, n=0):
 
     idx_list = np.argsort([x if x is not None else np.inf for x in losses])
     max_idx = np.argwhere(np.isfinite(np.array(losses)[idx_list])).flatten().max()
-
-    if n > max_idx:
-        return redirect(f"/best-trials/{max_idx}")
-
-    tr = trials[idx_list[n]]
-    fig = get_performance_plots(tr['result']['training_loss_hist'], tr['result']['validation_stats'])
-    img = fig_to_base64(fig, close=True).decode('utf-8')
     
-    stats = get_performance_stats(tr['result']['validation_stats'])
+    if n is not None:
+        n = int(n)
+        if n > max_idx:
+            return redirect(f"/best-trials/{max_idx}")
 
+        tr = trials[idx_list[n]]
+    elif tid is not None:
+        tid = int(tid)
+        for t in trials:
+            if t['tid'] == tid:
+                tr = t
+                break
+    elif label is not None:
+        for t in trials:
+            params = hyperopt.space_eval(SEARCH_SPACE, {k:v[0] for k,v in t['misc'].get('vals',{}).items()})
+            hsh = hashlib.sha1('hyperopt'.encode())
+            hsh.update(repr(sorted(params.items())).encode())
+
+            if label == 'hyperopt_' + hsh.hexdigest()[:12]Z
+                tr = t
+                break
+                
+    if tr is None:
+        return NotFound()
+        
+    for idx in idx_list:
+        if trials[idx] == tr:
+            n = idx
+            break
+            
+    if n is None:
+        n = 0
+        
+    if 'training_loss_hist' in tr['result']:
+        fig = get_performance_plots(tr['result']['training_loss_hist'], tr['result']['validation_stats'])
+        img = fig_to_base64(fig, close=True).decode('utf-8')
+        
+        stats = get_performance_stats(tr['result']['validation_stats'])
+    else:
+        img = ''
+        stats = {}
+        
     params = hyperopt.space_eval(SEARCH_SPACE, {k:v[0] for k,v in tr['misc'].get('vals',{}).items()})
 
     hsh = hashlib.sha1('hyperopt'.encode())
@@ -237,11 +280,11 @@ async def get_current_best(request, n=0):
         <div class="col-md-12 mb-4 mt-4 text-center">
         {make_button(f"/status", "server", text="Job Status")}
         <br><br>
-        {make_button(f"/best-trials/0{'' if not all_gens else '?allgens=t'}", "fast-backward", n==0)}
-        {make_button(f"/best-trials/{n-1}{'' if not all_gens else '?allgens=t'}", "chevron-left", n == 0)}
-        {make_button(f"/best-trials/{n}?refresh=True{'' if not all_gens else '&allgens=t'}", "refresh")}
-        {make_button(f"/best-trials/{n+1}{'' if not all_gens else '?allgens=t'}", "chevron-right", n == max_idx)}
-        {make_button(f"/best-trials/{max_idx}{'' if not all_gens else '?allgens=t'}", "fast-forward", n == max_idx)}
+        {make_button(f"/best-trials/?n=0{'' if not all_gens else '?allgens=t'}", "fast-backward", n==0)}
+        {make_button(f"/best-trials/?n={n-1}{'' if not all_gens else '?allgens=t'}", "chevron-left", n == 0)}
+        {make_button(f"/best-trials/?n={n}&refresh=True{'' if not all_gens else '&allgens=t'}", "refresh")}
+        {make_button(f"/best-trials/?n={n+1}{'' if not all_gens else '?allgens=t'}", "chevron-right", n == max_idx)}
+        {make_button(f"/best-trials/?n={max_idx}{'' if not all_gens else '?allgens=t'}", "fast-forward", n == max_idx)}
         </div>
         <br>
         <table class="table table-striped table-sm w-auto ml-1">
