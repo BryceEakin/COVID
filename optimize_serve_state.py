@@ -245,9 +245,9 @@ async def get_current_best(request):
     if tr is None:
         return NotFound()
         
-    for idx in idx_list:
+    for i, idx in enumerate(idx_list):
         if trials[idx] == tr:
-            n = idx
+            n = i
             break
             
     if n is None:
