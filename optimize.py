@@ -166,6 +166,8 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
             disable_checkpointing=True
         )
     except Exception as ex:
+        if isinstance(ex, RuntimeError):
+            raise
         return {'status': hyperopt.STATUS_FAIL, 'error': repr(ex)}
 
     try:
