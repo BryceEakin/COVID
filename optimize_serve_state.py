@@ -1,5 +1,5 @@
 from sanic import Sanic
-from sanic.response import html, file_stream, text, redirect
+from sanic.response import html, file_stream, text, redirect, json
 from sanic.exceptions import NotFound
 
 import sys, os
@@ -150,6 +150,8 @@ async def get_status(request):
     ) and t['owner'] is not None]
     
     queued = [t for t in TRIALS.trials if t['state'] == hyperopt.JOB_STATE_NEW and t not in running]
+    
+    failed = [t for t in TRIALS.trials if t['result'].get('status') == 'fail']
 
     return html(f"""
         <html>
@@ -158,7 +160,7 @@ async def get_status(request):
         <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
         <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
         <div class="col-md-12 mb-4 mt-4 text-center">
-        {make_button(f"/best-trials/0", "eye", text="Review Models")}
+        {make_button(f"/best-trials/?n=0", "eye", text="Review Models")}
         <br><br>
         {make_button(f"/status?refresh=True", "refresh")}
         </div>
@@ -172,10 +174,79 @@ async def get_status(request):
         <tr>{'</tr><tr>'.join(f'<td>{t["owner"][0] if t["owner"] is not None else "n/a"}</td><td>{t["exp_key"]}</td><td><a href="/best-trials/?tid={t["tid"]}">{t["tid"]}</a></td>' for t in running)}</tr>
         </tbody></table>
         <h2>{len(queued)} items queued</h2>
+        <h2>Failed<h3>
+        {'<br>'.join(f'<a href="/best-trials/raw?tid={t["tid"]}">{t["tid"]}</a>' for t in failed)}
         </body>
         </html>
     """)
 
+@app.get("/best-trials/raw")
+async def trials_raw(request):
+    n = request.args.get('n')
+    tid = request.args.get('tid')
+    label = request.args.get('label')
+    
+    if all(x is None for x in (n, tid, label)):
+        n = 0
+
+    if 'refresh' in request.args:
+        TRIALS.refresh()
+        
+    if len(TRIALS.trials) == 0:
+        redirect(f"/status")
+    
+    tr = None
+    
+    trials = list(TRIALS.trials)
+    trials.sort(key=lambda x: x['exp_key'], reverse=True)
+
+    if 'allgens' in request.args:
+        all_gens = True
+    else:
+        all_gens = False
+        trials = [x for x in trials if x['exp_key'] == trials[0]['exp_key']]
+
+    losses = []
+    for tr in trials:
+        loss = min(list(zip(*tr['result'].get('validation_stats', [(0,np.inf, 0, 0)])))[1])
+        #loss = tr['result'].get('loss', np.inf)
+        if tr['state'] != 2: # Not Done
+            loss = np.inf
+
+        if loss in losses:
+            losses.append(np.inf)
+        else:
+            losses.append(loss)
+
+    idx_list = np.argsort([x if x is not None else np.inf for x in losses])
+    max_idx = np.argwhere(np.isfinite(np.array(losses)[idx_list])).flatten().max()
+    
+    if n is not None:
+        n = int(n)
+        if n > max_idx:
+            return redirect(f"/best-trials/{max_idx}")
+
+        tr = trials[idx_list[n]]
+    elif tid is not None:
+        tid = int(tid)
+        for t in trials:
+            if t['tid'] == tid:
+                tr = t
+                break
+    elif label is not None:
+        for t in trials:
+            params = hyperopt.space_eval(SEARCH_SPACE, {k:v[0] for k,v in t['misc'].get('vals',{}).items()})
+            hsh = hashlib.sha1('hyperopt'.encode())
+            hsh.update(repr(sorted(params.items())).encode())
+
+            if label == 'hyperopt_' + hsh.hexdigest()[:12]:
+                tr = t
+                break
+                
+    if tr is None:
+        return NotFound()
+        
+    return json(tr)
 
 @app.get("/best-trials")
 async def get_current_best(request):
