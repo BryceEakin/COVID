@@ -88,12 +88,19 @@ async def delete_failed(request):
         jobs.find_one_and_delete({'_id':obj['_id']})
     return redirect("/status")
 
+@app.get('/delete-gen/{gen}')
+async def delete_gen(request, gen):
+    gen_trials = MongoTrials('mongo://localhost:1234/covid/jobs', f'covid-{gen}')
+    gen_trials.refresh()
+    gen_trials.delete_all()
+    return redirect(f"/status/?refresh=true")
+
 @app.get('/delete-all/yes-really')
 async def delete_all_yes_really(request):
     TRIALS.refresh()
     TRIALS.delete_all()
     TRIALS.refresh()
-    return redirect(f"/status")
+    return redirect(f"/status/?refresh=true")
 
 @app.put("/training-state/<run_id>", stream=True)
 async def put_training_state(request, run_id):
@@ -275,8 +282,6 @@ async def get_current_best(request):
     
     tr = None
     
-
-
     trials = list(TRIALS.trials)
     trials.sort(key=lambda x: x['exp_key'], reverse=True)
 
