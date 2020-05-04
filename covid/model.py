@@ -160,9 +160,11 @@ def run_model(model, batch, device):
     
     mask = T.ones_like(result, requires_grad=False)
     mask[(~T.isfinite(result))] = 0
+    mask[result < 0] = 0
+    mask[result > 1] = 0
     
     incr = T.zeros_like(result, requires_grad=False)
-    incr[(~T.isfinite(result))] = 0.5
+    incr[~mask] = 0.5
     
     result = result * mask + incr
 
