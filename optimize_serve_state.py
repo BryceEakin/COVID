@@ -238,7 +238,7 @@ async def get_current_best(request):
             hsh = hashlib.sha1('hyperopt'.encode())
             hsh.update(repr(sorted(params.items())).encode())
 
-            if label == 'hyperopt_' + hsh.hexdigest()[:12]Z
+            if label == 'hyperopt_' + hsh.hexdigest()[:12]:
                 tr = t
                 break
                 
