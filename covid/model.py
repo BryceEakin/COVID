@@ -164,7 +164,7 @@ def run_model(model, batch, device):
     mask[result > 1] = 0
     
     incr = T.zeros_like(result, requires_grad=False)
-    incr[~mask] = 0.5
+    incr[mask == 0] = 0.5
     
     result = result * mask + incr
 
