@@ -169,7 +169,7 @@ async def get_status(request):
         <thead class="thead-light">
         <th>Node</th><th>Generation</th><th>Id</th>
         </thead><tbody>
-        <tr>{'</tr><tr>'.join(f"""<td>{t['owner'][0] if t['owner'] is not None else 'n/a'}</td><td>{t['exp_key']}</td><td><a href="/best-trials/?tid={t['tid']}">{t['tid']}</a></td>""" for t in running)}</tr>
+        <tr>{'</tr><tr>'.join(f'<td>{t["owner"][0] if t["owner"] is not None else "n/a"}</td><td>{t["exp_key"]}</td><td><a href="/best-trials/?tid={t["tid"]}">{t["tid"]}</a></td>" for t in running)}</tr>
         </tbody></table>
         <h2>{len(queued)} items queued</h2>
         </body>
