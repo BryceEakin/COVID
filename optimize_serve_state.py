@@ -19,6 +19,7 @@ from covid.constants import MODE_NAMES
 import hyperopt
 from hyperopt import hp
 import hashlib
+from pymongo import MongoClient
 
 from collections import Counter, defaultdict
 
@@ -78,6 +79,15 @@ async def get_training_state(request, run_id):
         )
     raise NotFound("No state exists for that id")
         
+        
+@app.get('/delete-failed')
+async def delete_failed(request):
+    jobs = MongoClient('localhost', 1234).covid.jobs
+    to_delete = list(jobs.find({'result.status':'fail'}))
+    for obj in to_delete:
+        jobs.find_one_and_delete({'_id':obj['_id']})
+    return redirect("/status")
+
 @app.get('/delete-all/yes-really')
 async def delete_all_yes_really(request):
     TRIALS.refresh()
