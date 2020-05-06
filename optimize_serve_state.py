@@ -23,6 +23,9 @@ from pymongo import MongoClient
 
 from collections import Counter, defaultdict
 
+from pprint import pformat
+import humanize
+
 PORT = 5535
 
 SEARCH_SPACE = {
@@ -67,6 +70,7 @@ def fig_to_base64(fig, close=False, **save_kwargs):
     return result
 
 app = Sanic(name='CovidProject')
+TRIALS_REFRESHED = datetime.now()
 TRIALS = MongoTrials('mongo://localhost:1234/covid/jobs')
 
 @app.get("/training-state/<run_id>")
@@ -78,29 +82,6 @@ async def get_training_state(request, run_id):
             filename=f"{run_id}__state.pkl.gz"
         )
     raise NotFound("No state exists for that id")
-        
-        
-@app.get('/delete-failed')
-async def delete_failed(request):
-    jobs = MongoClient('localhost', 1234).covid.jobs
-    to_delete = list(jobs.find({'result.status':'fail'}))
-    for obj in to_delete:
-        jobs.find_one_and_delete({'_id':obj['_id']})
-    return redirect("/status")
-
-@app.get('/delete-gen/<gen>')
-async def delete_gen(request, gen):
-    gen_trials = MongoTrials('mongo://localhost:1234/covid/jobs', f'covid-{gen}')
-    gen_trials.refresh()
-    gen_trials.delete_all()
-    return redirect(f"/status/?refresh=true")
-
-@app.get('/delete-all/yes-really')
-async def delete_all_yes_really(request):
-    TRIALS.refresh()
-    TRIALS.delete_all()
-    TRIALS.refresh()
-    return redirect(f"/status/?refresh=true")
 
 @app.put("/training-state/<run_id>", stream=True)
 async def put_training_state(request, run_id):
@@ -116,12 +97,93 @@ async def put_training_state(request, run_id):
     shutil.move(f"./training_state/{run_id}__state.pkl.gz.tmp", f"./training_state/{run_id}__state.pkl.gz")
     return text("Model State Uploaded")
 
-def make_button(to, icon, disabled=False, text=None):
+def create_delete_prompt(desc = "Something"):
+    return f"""
+        <html>
+        <head><meta name="viewport" content="width=device-width, initial-scale=1"/></head>
+        <body>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+        <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+        <h2>DELETE {desc}</h2>
+        <strong>Are you sure?</strong>
+        <form action="" method="get">
+        <input type="text" name="really" placeholder="Type 'yes' to confirm"/>
+        </form>
+    """
+        
+@app.get('/delete-failed')
+async def delete_failed(request):
+    if request.args.get("really", "no") == "yes":
+        jobs = MongoClient('localhost', 1234).covid.jobs
+        to_delete = list(jobs.find({'result.status':'fail'}))
+        for obj in to_delete:
+            jobs.find_one_and_delete({'_id':obj['_id']})
+        return redirect("/status")
+    return html()
+
+@app.get('/delete-gen/<gen>')
+async def delete_gen(request, gen):
+    if request.args.get('really', 'no') == 'yes':
+        gen_trials = MongoTrials('mongo://localhost:1234/covid/jobs', f'covid-{gen}')
+        gen_trials.refresh()
+        gen_trials.delete_all()
+        return redirect(f"/status/?refresh=true")
+    return html(f"""
+        <html>
+        <head><meta name="viewport" content="width=device-width, initial-scale=1"/></head>
+        <body>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+        <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+        <h2>DELETE GENERATION 'covid-{gen}'</h2>
+        <strong>Are you sure?</strong>
+        <form action="" method="get">
+        <input type="text" name="really" placeholder="Type 'yes' to confirm"/>
+        </form>
+    """)
+
+@app.get('/delete-all')
+async def delete_all_yes_really(request):
+    if request.args.get('really', 'no') == 'yes':
+        TRIALS.refresh()
+        TRIALS.delete_all()
+        TRIALS.refresh()
+        return redirect(f"/status/?refresh=true")
+    return html(f"""
+        <html>
+        <head><meta name="viewport" content="width=device-width, initial-scale=1"/></head>
+        <body>
+        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+        <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+        <h2>DELETE ALL DATA & JOBS</h2>
+        <strong>Are you sure?</strong>
+        <form action="" method="get">
+        <input type="text" name="really" placeholder="Type 'yes' to confirm"/>
+        </form>
+    """)
+
+
+
+def make_button(to, icon, disabled=False, text=None, cls='btn-info px-3'):
     return f"""
         <a class="btn btn-info px-3 {'disabled' if disabled else ''}" role="button" href="{to}">
             <i class="fa fa-{icon}"></i>{' ' + text if text is not None else ''}
         </a>
     """
+
+def make_jobs_table(jobs_list):
+    return f"""<table class="table table-striped table-sm w-auto ml-1">
+        <thead class="thead-light">
+        <th>Gen</th><th>Node</th><th>Created</th><th>Runtime</th><th>Id</th>
+        </thead><tbody>
+        <tr>{'</tr><tr>'.join(
+            f'<td>{t["exp_key"]}</td>'
+            + f'<td>{t["owner"][0] if t["owner"] is not None else "n/a"}</td>'
+            + f'<td>{"" if t["book_time"] is None else humanize.naturaltime(t["book_time"])}</td>'
+            + f'<td>{"" if t["refresh_time"] is None else str(t["refresh_time"] - t["book_time"])}</td>'
+            + f'<td><a href="/best-trials/?tid={t["tid"]}">{t["tid"]}</a></td>'
+            for t in jobs_list
+        )}</tr>
+        </tbody></table>"""
 
 @app.get("/status")
 async def get_status(request):
@@ -164,11 +226,11 @@ async def get_status(request):
     running = [t for t in TRIALS.trials if t['state'] in (
         hyperopt.JOB_STATE_RUNNING,
         hyperopt.JOB_STATE_NEW
-    ) and t['owner'] is not None]
-    
-    queued = [t for t in TRIALS.trials if t['state'] == hyperopt.JOB_STATE_NEW and t not in running]
+    )]
     
     failed = [t for t in TRIALS.trials if t['result'].get('status') == 'fail']
+
+    completed = [t for t in TRIALS.trials if t not in running and t not in failed]
 
     return html(f"""
         <html>
@@ -183,16 +245,11 @@ async def get_status(request):
         </div>
         <h2>Optimizer Generations</h2>
         {status_table}
-        <h2>Active Jobs</h2>
-        <table class="table table-striped table-sm w-auto ml-1">
-        <thead class="thead-light">
-        <th>Node</th><th>Generation</th><th>Id</th>
-        </thead><tbody>
-        <tr>{'</tr><tr>'.join(f'<td>{t["owner"][0] if t["owner"] is not None else "n/a"}</td><td>{t["exp_key"]}</td><td><a href="/best-trials/?tid={t["tid"]}">{t["tid"]}</a></td>' for t in running)}</tr>
-        </tbody></table>
-        <h2>{len(queued)} items queued</h2>
-        <h2>Failed</h2>
-        {'<br>'.join(f'<a href="/best-trials/raw?tid={t["tid"]}">{t["tid"]}</a>' for t in failed)}
+        <h2>{len(running)} Active Jobs</h2>
+        {make_jobs_table(running)}
+        <h2>{len(failed)} Failed</h2>
+        {make_jobs_table(failed)}
+        <h3>{len(completed)} Completed</h3>
         </body>
         </html>
     """)
@@ -263,7 +320,7 @@ async def trials_raw(request):
     if tr is None:
         return NotFound()
         
-    return text(repr(tr))
+    return text(pformat(tr))
 
 @app.get("/best-trials")
 async def get_current_best(request):
@@ -368,7 +425,7 @@ async def get_current_best(request):
         <br><br>
         {make_button(f"/best-trials/?n=0{'' if not all_gens else '?allgens=t'}", "fast-backward", n==0)}
         {make_button(f"/best-trials/?n={n-1}{'' if not all_gens else '?allgens=t'}", "chevron-left", n == 0)}
-        {make_button(f"/best-trials/?n={n}&refresh=True{'' if not all_gens else '&allgens=t'}", "refresh")}
+        {make_button(f"/best-trials/?tid={tr['tid']}&refresh=True{'' if not all_gens else '&allgens=t'}", "refresh")}
         {make_button(f"/best-trials/?n={n+1}{'' if not all_gens else '?allgens=t'}", "chevron-right", n == max_idx)}
         {make_button(f"/best-trials/?n={max_idx}{'' if not all_gens else '?allgens=t'}", "fast-forward", n == max_idx)}
         </div>
@@ -383,6 +440,11 @@ async def get_current_best(request):
         <tr><th>Epoch</th><td>{stats['epoch'][-1]:0.0f}</td></tr>
         </tbody>
         </table>
+
+        <div class="col-md-12 mb-4 mt-4 text-center">
+        {make_button(f"/best-trials/raw?tid=" + str(tr['tid']), "code", text="Full JSON Details")}
+        </div>
+
         <table class="table table-striped table-sm w-auto ml-1">
         <thead class="thead-light"><th>stat</th><th>{'</th><th>'.join(MODE_NAMES)}</th></thead>
         <tbody>
