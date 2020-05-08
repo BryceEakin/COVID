@@ -20,13 +20,14 @@ import hyperopt
 from hyperopt import hp
 import hashlib
 from pymongo import MongoClient
+from bson import ObjectId
 
 from collections import Counter, defaultdict
 
 from pprint import pformat
 import humanize
 
-PORT = 5535
+PORT = 5000
 
 SEARCH_SPACE = {
         'synthetic_negative_rate': hp.uniform('neg_rate', 0, 0.5),
@@ -113,54 +114,40 @@ def create_delete_prompt(desc = "Something"):
         
 @app.get('/delete-failed')
 async def delete_failed(request):
+    global TRIALS, TRIALS_REFRESHED
+
     if request.args.get("really", "no") == "yes":
         jobs = MongoClient('localhost', 1234).covid.jobs
         to_delete = list(jobs.find({'result.status':'fail'}))
         for obj in to_delete:
             jobs.find_one_and_delete({'_id':obj['_id']})
+        TRIALS_REFRESHED = datetime.now()
+        TRIALS.refresh()
         return redirect("/status")
-    return html()
+    return html(create_delete_prompt("FAILED JOBS"))
 
 @app.get('/delete-gen/<gen>')
 async def delete_gen(request, gen):
+    global TRIALS, TRIALS_REFRESHED
+
     if request.args.get('really', 'no') == 'yes':
         gen_trials = MongoTrials('mongo://localhost:1234/covid/jobs', f'covid-{gen}')
         gen_trials.refresh()
         gen_trials.delete_all()
         return redirect(f"/status/?refresh=true")
-    return html(f"""
-        <html>
-        <head><meta name="viewport" content="width=device-width, initial-scale=1"/></head>
-        <body>
-        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
-        <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
-        <h2>DELETE GENERATION 'covid-{gen}'</h2>
-        <strong>Are you sure?</strong>
-        <form action="" method="get">
-        <input type="text" name="really" placeholder="Type 'yes' to confirm"/>
-        </form>
-    """)
+    return html(create_delete_prompt(f"GENERATION 'covid-{gen}'"))
 
 @app.get('/delete-all')
 async def delete_all_yes_really(request):
+    global TRIALS, TRIALS_REFRESHED
+
     if request.args.get('really', 'no') == 'yes':
         TRIALS.refresh()
+        TRIALS_REFRESHED = datetime.now()
         TRIALS.delete_all()
         TRIALS.refresh()
         return redirect(f"/status/?refresh=true")
-    return html(f"""
-        <html>
-        <head><meta name="viewport" content="width=device-width, initial-scale=1"/></head>
-        <body>
-        <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
-        <link href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
-        <h2>DELETE ALL DATA & JOBS</h2>
-        <strong>Are you sure?</strong>
-        <form action="" method="get">
-        <input type="text" name="really" placeholder="Type 'yes' to confirm"/>
-        </form>
-    """)
-
+    return html(create_delete_prompt(f"ALL DATA AND JOBS"))
 
 
 def make_button(to, icon, disabled=False, text=None, cls='btn-info px-3'):
@@ -187,8 +174,11 @@ def make_jobs_table(jobs_list):
 
 @app.get("/status")
 async def get_status(request):
+    global TRIALS, TRIALS_REFRESHED
+
     if 'refresh' in request.args:
         TRIALS.refresh()
+        TRIALS_REFRESHED = datetime.now()
 
     state_lookup = {getattr(hyperopt, k):k for k in ['JOB_STATE_NEW', 'JOB_STATE_ERROR', 'JOB_STATE_RUNNING', 'JOB_STATE_DONE']}
     state_lookup[-1] = 'JOB_STATE_Prev-Level Hints'
@@ -243,6 +233,7 @@ async def get_status(request):
         <br><br>
         {make_button(f"/status?refresh=True", "refresh")}
         </div>
+        <i>Data refreshed {humanize.naturaltime(TRIALS_REFRESHED)}</i><br/>
         <h2>Optimizer Generations</h2>
         {status_table}
         <h2>{len(running)} Active Jobs</h2>
@@ -256,6 +247,8 @@ async def get_status(request):
 
 @app.get("/best-trials/raw")
 async def trials_raw(request):
+    global TRIALS, TRIALS_REFRESHED
+
     n = request.args.get('n')
     tid = request.args.get('tid')
     label = request.args.get('label')
@@ -265,6 +258,7 @@ async def trials_raw(request):
 
     if 'refresh' in request.args:
         TRIALS.refresh()
+        TRIALS_REFRESHED = datetime.now()
         
     if len(TRIALS.trials) == 0:
         redirect(f"/status")
@@ -322,17 +316,39 @@ async def trials_raw(request):
         
     return text(pformat(tr))
 
+@app.get("/delete-trial/<id>")
+async def delete_trial(request, id):
+    global TRIALS, TRIALS_REFRESHED
+
+    jobs = MongoClient('localhost', 1234).covid.jobs
+    job = jobs.find_one({'_id':ObjectId(id)})
+
+    if job is None:
+        return NotFound()
+
+    if request.args.get("really", "no") == "yes":
+        jobs.find_one_and_delete({'_id':ObjectId(id)})
+        TRIALS_REFRESHED = datetime.now()
+        TRIALS.refresh()
+        return redirect("/status")
+    return html(create_delete_prompt(f"JOB {job['tid']}"))
+
+
 @app.get("/best-trials")
 async def get_current_best(request):
+    global TRIALS, TRIALS_REFRESHED
+
     n = request.args.get('n')
     tid = request.args.get('tid')
     label = request.args.get('label')
+    gen = request.args.get('gen')
     
     if all(x is None for x in (n, tid, label)):
         n = 0
 
     if 'refresh' in request.args:
         TRIALS.refresh()
+        TRIALS_REFRESHED = datetime.now()
         
     if len(TRIALS.trials) == 0:
         redirect(f"/status")
@@ -342,11 +358,20 @@ async def get_current_best(request):
     trials = list(TRIALS.trials)
     trials.sort(key=lambda x: x['exp_key'], reverse=True)
 
-    if 'allgens' in request.args:
-        all_gens = True
-    else:
-        all_gens = False
-        trials = [x for x in trials if x['exp_key'] == trials[0]['exp_key']]
+    if gen is not None:
+        gen = int(gen)
+        trials = []
+        for t in TRIALS.trials:
+            try:
+                epoch = int(t['result'].get('training_loss_hist', [(-1,np.inf)])[-1][0] + 1e-8)
+            except:
+                epoch = -1
+            
+            if epoch == gen and t['exp_key'] == f'covid-{gen}':
+                trials.append(t)
+
+    all_gens = False
+    trials = [x for x in trials if x['exp_key'] == trials[0]['exp_key']]
 
     losses = []
     for tr in trials:
@@ -363,10 +388,12 @@ async def get_current_best(request):
     idx_list = np.argsort([x if x is not None else np.inf for x in losses])
     max_idx = np.argwhere(np.isfinite(np.array(losses)[idx_list])).flatten().max()
     
+    button_suffix = '' if gen is None else f'gen={gen}'
+
     if n is not None:
         n = int(n)
         if n > max_idx:
-            return redirect(f"/best-trials/{max_idx}")
+            return redirect(f"/best-trials/?n={max_idx}&{button_suffix}")
 
         tr = trials[idx_list[n]]
     elif tid is not None:
@@ -384,10 +411,10 @@ async def get_current_best(request):
             if label == 'hyperopt_' + hsh.hexdigest()[:12]:
                 tr = t
                 break
-                
+    
     if tr is None:
         return NotFound()
-        
+
     for i, idx in enumerate(idx_list):
         if trials[idx] == tr:
             n = i
@@ -423,12 +450,13 @@ async def get_current_best(request):
         <div class="col-md-12 mb-4 mt-4 text-center">
         {make_button(f"/status", "server", text="Job Status")}
         <br><br>
-        {make_button(f"/best-trials/?n=0{'' if not all_gens else '?allgens=t'}", "fast-backward", n==0)}
-        {make_button(f"/best-trials/?n={n-1}{'' if not all_gens else '?allgens=t'}", "chevron-left", n == 0)}
-        {make_button(f"/best-trials/?tid={tr['tid']}&refresh=True{'' if not all_gens else '&allgens=t'}", "refresh")}
-        {make_button(f"/best-trials/?n={n+1}{'' if not all_gens else '?allgens=t'}", "chevron-right", n == max_idx)}
-        {make_button(f"/best-trials/?n={max_idx}{'' if not all_gens else '?allgens=t'}", "fast-forward", n == max_idx)}
+        {make_button(f"/best-trials/?n=0&{button_suffix}", "fast-backward", n==0)}
+        {make_button(f"/best-trials/?n={n-1}&{button_suffix}", "chevron-left", n == 0)}
+        {make_button(f"/best-trials/?tid={tr['tid']}&refresh=True&{button_suffix}", "refresh")}
+        {make_button(f"/best-trials/?n={n+1}&{button_suffix}", "chevron-right", n == max_idx)}
+        {make_button(f"/best-trials/?n={max_idx}&{button_suffix}", "fast-forward", n == max_idx)}
         </div>
+        <i>Data refreshed {humanize.naturaltime(TRIALS_REFRESHED)}</i><br/>
         <br>
         <table class="table table-striped table-sm w-auto ml-1">
         <tbody>
@@ -443,8 +471,9 @@ async def get_current_best(request):
 
         <div class="col-md-12 mb-4 mt-4 text-center">
         {make_button(f"/best-trials/raw?tid=" + str(tr['tid']), "code", text="Full JSON Details")}
+        {make_button(f"/delete-trial/{tr['_id']}", 'trash', text='Delete Trial')}
         </div>
-
+        <img src="data:image/png;base64, {img}" class="img-fluid"/>
         <table class="table table-striped table-sm w-auto ml-1">
         <thead class="thead-light"><th>stat</th><th>{'</th><th>'.join(MODE_NAMES)}</th></thead>
         <tbody>
@@ -453,7 +482,7 @@ async def get_current_best(request):
             ) + '</td></tr>' for k,vals in stats.items() if k != 'epoch'
         )}
         </tbody></table>
-        <img src="data:image/png;base64, {img}" class="img-fluid"/>
+        
         <h4>Parameters</h4>
         <table class="table table-sm w-auto ml-1" >
         <tr>{'</tr><tr>'.join('<th>{0}</th><td>{1}</td>'.format(k,v) for k,v in params.items())}</tr>
