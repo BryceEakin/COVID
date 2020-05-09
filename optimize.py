@@ -119,6 +119,9 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
     config.max_epochs = num_epochs
     config.batch_size = 24
 
+    for k,v in params.items():
+        print(f"{k} = {v}")
+
     config.optim_adam_betas = (params['adam_beta1'], params['adam_beta2'])
     del params['adam_beta1']
     del params['adam_beta2']
@@ -160,18 +163,16 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
             os.remove(training_state_path)
         shutil.move(training_state_path + ".tmp", training_state_path)
 
-    try:
-        losses, validation_stats = train_model(
-            config, 
-            run_name=label,
-            disable_training_resume=False, 
-            check_interrupted=check_interrupted, 
-            disable_checkpointing=True
-        )
-    except Exception as ex:
-        if isinstance(ex, RuntimeError):
-            raise
-        return {'status': hyperopt.STATUS_FAIL, 'error': repr(ex)}
+    
+    losses, validation_stats = train_model(
+        config, 
+        run_name=label,
+        disable_training_resume=False, 
+        check_interrupted=check_interrupted, 
+        disable_checkpointing=True
+    )
+    
+    #return {'status': hyperopt.STATUS_FAIL, 'error': repr(ex)}
 
     try:
         with open(training_state_path, 'rb') as f:
@@ -188,7 +189,7 @@ def test_parameterization(params, num_epochs, check_interrupted=None):
     
     v_x, vloss, _, _ = zip(*validation_stats)
 
-    hist_length = {2:3, 3:5, 5:8}.get(num_epochs, 10)
+    hist_length = {1:5, 2:8, 3:12, 5:15}.get(num_epochs, 20)
 
     slope, intercept, _, _, _ = linregress(v_x[-hist_length:], vloss[-hist_length:])
 
