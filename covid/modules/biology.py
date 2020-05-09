@@ -14,6 +14,69 @@ __ALL__ = [
     'create_protein_models'
 ]
 
+class ProteinMultiheadAttention(nn.Module):
+    def __init__(self, num_channels, num_heads, window):
+        super().__init__()
+
+        self.conv_heads = apply_to_protein_batch(
+            nn.Conv1d(num_channels, num_heads, (window, ), 1, (window-1)//2)
+        )
+
+    def forward(self, x):
+        return self.conv_heads(x).batchwise_apply(T.softmax, -1)
+
+class ProteinMHAttentionTransformer(ProteinMultiheadAttention):
+    def __init__(self, num_channels, num_heads, window):
+        super().__init__(num_channels, num_heads, window)
+
+        self.result_transforms = nn.ModuleList([
+            apply_to_protein_batch(
+                nn.Conv1d(num_channels, num_channels, (1, ), 1, 0)
+            ) for _ in range(num_heads)
+        ])
+
+    def forward(self, x):
+        focuses = super().forward(x)
+
+        result = None
+
+        for head_idx, transform in enumerate(self.result_transforms):
+            head_result = transform(
+                focuses[(slice(None), slice(head_idx, head_idx+1), slice(None))] * x
+            )
+
+            if result is None:
+                result = head_result
+            else:
+                result = result + head_result
+
+        return result
+
+class ProteinMHAttentionSummarizer(ProteinMultiheadAttention):
+    def __init__(self, num_channels, num_heads, window, reduce='max'):
+        super().__init__(num_channels, num_heads, window)
+
+        if reduce not in ('max', 'mean', 'sum'):
+            raise ValueError('Unknown reduction function -- expected max, mean, or sum')
+        
+        self.reduce = reduce
+
+    def forward(self, x):
+        reduce = getattr(T, self.reduce)
+        if self.reduce == 'max':
+            def reduce(*args, **kwargs):
+                return T.max(*args, **kwargs)[0]
+            
+        focuses = super().forward(x)
+
+        return reduce(T.cat([
+            (focuses[
+                (slice(None), slice(head_idx, head_idx + 1), slice(None))
+            ] * x).batchwise_apply(T.sum, -1, keepdim=True, output_protein=False)
+            for head_idx in range(focuses.num_channels)
+        ], -1), -1)
+
+
 class ProteinHeadModel(nn.Module):
     def __init__(self,
                  base_dim=64,
@@ -23,7 +86,12 @@ class ProteinHeadModel(nn.Module):
                  maxpool=True):
         super().__init__()
 
-        resnet = functools.partial(create_resnet_block_1d, for_protein_batch=True, nonlinearity=nonlinearity)
+        resnet = functools.partial(
+            create_resnet_block_1d, 
+            for_protein_batch=True, 
+            nonlinearity=nonlinearity,
+            norm='instance'
+        )
 
         self.module = nn.Sequential(
             # 21->100 channels inplace convolution
@@ -70,77 +138,110 @@ class _ProteinMiddleModel(nn.Module):
                  input_dim=512,
                  context_dim=256,
                  dropout=0.2,
-                 nonlinearity='silu'):
+                 nonlinearity='silu',
+                 num_attention_layers=3,
+                 num_attention_heads=8,
+                 attention_window=3):
         super().__init__()
 
-        resnet = functools.partial(create_resnet_block_1d, for_protein_batch=True, nonlinearity=nonlinearity)
+        resnet = functools.partial(
+            create_resnet_block_1d, 
+            for_protein_batch=True, 
+            nonlinearity=nonlinearity,
+            norm='batch'
+        )
 
         self.context_model = nn.Sequential(
+            nn.BatchNorm1d(context_dim),
+            nn.Dropout(dropout),
             nn.Linear(context_dim, input_dim),
             NONLINEARITIES[nonlinearity](),
-            nn.Dropout(dropout),
-            nn.Linear(input_dim, input_dim // 2)
+            nn.Linear(input_dim, input_dim)
         )
 
         self.model = nn.Sequential(
-            # inplace convolution
-            apply_to_protein_batch(nn.Conv1d(input_dim, input_dim, (1, ), 1, 0)),
+            *[
+                apply_to_protein_batch(nn.Dropout(dropout)),
 
-            #Do some resnet
-            resnet(input_dim, input_dim // 4, inner_kernel=3),
-            resnet(input_dim, input_dim // 4, inner_kernel=5),
-            apply_to_protein_batch(nn.Dropout(dropout)),
+                # inplace convolution
+                apply_to_protein_batch(nn.Conv1d(input_dim, input_dim, (1, ), 1, 0)),
 
-            resnet(input_dim, input_dim // 4, inner_kernel=3),
-            resnet(input_dim, input_dim // 4, inner_kernel=5),
-            apply_to_protein_batch(nn.Dropout(dropout)),
+            ] + [
 
-            # inplace convolution
-            apply_to_protein_batch(nn.Conv1d(input_dim, input_dim, (1, ), 1, 0)),
+                # For each attention layer...
+                ResidualBlock(nn.Sequential(
+                    apply_to_protein_batch(nn.BatchNorm1d(input_dim)),
+                    apply_to_protein_batch(NONLINEARITIES[nonlinearity]()),
+                    ProteinMHAttentionTransformer(input_dim, num_attention_heads, attention_window),
+                    resnet(input_dim, input_dim // 4, inner_kernel=3),
+                    resnet(input_dim, input_dim // 4, inner_kernel=5),
+                ), None)
+                for _ in range(num_attention_layers)
+            ] + [
+            
+                # inplace convolution
+                apply_to_protein_batch(nn.Conv1d(input_dim, input_dim, (1, ), 1, 0)),
+            ]
         )
 
     def forward(self, state, context):
-        channel_reweighting = T.tanh(self.context_model(context)) + 1.0
+        channel_reweighting = T.tanh(self.context_model(context)) + 1.0 + 1e-8
         
-        # Reweight half of the channels to avoid vanishing gradients
-        channel_reweighting = T.cat(
-            (channel_reweighting, T.ones_like(channel_reweighting)), 
-            -1
+        # Ensure, on average, signal doesn't change
+        channel_reweighting = (
+            channel_reweighting / channel_reweighting.mean(-1, keepdim=True)
         ).unsqueeze(-1)
+        
+        return self.model(state * channel_reweighting)
 
-        state = state * channel_reweighting
-
-        return self.model(state)
 
 def create_protein_model_middle(input_dim=512,
                                 context_dim=256,
                                 dropout=0.2,
-                                nonlinearity='silu'):
-    return ResidualBlock(
-        _ProteinMiddleModel(input_dim, context_dim, dropout, nonlinearity),
-        apply_to_protein_batch(NONLINEARITIES[nonlinearity]())
-    )
+                                nonlinearity='silu',
+                                attention_layers=3,
+                                attention_heads=8,
+                                attention_window=3):
+    return ResidualBlock(_ProteinMiddleModel(
+        input_dim, context_dim, dropout, nonlinearity, attention_layers, attention_heads, attention_window
+    ), None)
+
 
 def create_protein_model_tail(input_dim=512,
                               output_dim=256,
                               dropout=0.2,
-                              nonlinearity='silu'):
+                              nonlinearity='silu',
+                              output_attention=True,
+                              output_attention_heads=16,
+                              output_attention_window=1):
 
     resnet = functools.partial(create_resnet_block_1d, for_protein_batch=True, nonlinearity=nonlinearity)
 
+    if not output_attention:
+        # Take the max on each channel
+        summarizer = nn.Sequential(
+            apply_to_protein_batch(nn.MaxPool1d(100000, ceil_mode=True)),
+            # Convert protein batch to standard batch format
+            ProteinBatchToPaddedBatch(),
+            Squeeze(-1),
+        )
+
+    else:
+        summarizer = ProteinMHAttentionSummarizer(input_dim, output_attention_heads, output_attention_window)
+
     return nn.Sequential(
+        apply_to_protein_batch(nn.Dropout(dropout)),
+
         # Final resneting
         resnet(input_dim, input_dim // 4, inner_kernel=3),
         resnet(input_dim, input_dim // 4, inner_kernel=3),
         
-        # Take the max on each channel
-        apply_to_protein_batch(nn.MaxPool1d(100000, ceil_mode=True)),
-        
-        # Convert protein batch to standard batch format
-        ProteinBatchToPaddedBatch(),
-        
-        Squeeze(-1),
-        nn.Dropout(dropout),
+        # Converts from protein batch to standard tensor here
+        apply_to_protein_batch(nn.BatchNorm1d(input_dim)),
+        apply_to_protein_batch(NONLINEARITIES[nonlinearity]()),
+
+        summarizer,
+
         nn.Linear(input_dim, input_dim),
         NONLINEARITIES[nonlinearity](),
         nn.Linear(input_dim, output_dim),
@@ -152,9 +253,22 @@ def create_protein_models(base_dim=16,
                           dropout=0.2,
                           nonlinearity='silu',
                           downscale_nonlinearity='tanh',
-                          maxpool=True):
+                          maxpool=True,
+                          attention_layers=3,
+                          attention_heads=8,
+                          attention_window=3,
+                          output_use_attention=True,
+                          output_attention_heads=16):
     head = ProteinHeadModel(base_dim, dropout, nonlinearity, downscale_nonlinearity, maxpool)
-    middle = create_protein_model_middle(base_dim * 16, context_dim, dropout, nonlinearity)
-    tail = create_protein_model_tail(base_dim * 16, output_dim, dropout, nonlinearity)
+    middle = create_protein_model_middle(
+        base_dim * 16, context_dim, dropout, nonlinearity, attention_layers, attention_heads, attention_window
+    )
+    tail = create_protein_model_tail(
+        base_dim * 16, output_dim, dropout, nonlinearity, output_use_attention, output_attention_heads
+    )
 
     return head, middle, tail
+
+
+
+        

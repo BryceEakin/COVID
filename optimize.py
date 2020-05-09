@@ -17,12 +17,12 @@ from hyperopt import hp
 from hyperopt.mongoexp import MongoTrials
 from scipy.stats import linregress
 
-from covid.training import CovidTrainingConfiguration, train_model
+from covid.training import CovidTrainingConfiguration, train_model, set_random_seeds
 from covid.utils import getch
 
 # List of (depth, new_budget, extend_budget)  thruples
 LEVEL_DEFS = [
-    (1, 100, 0),
+    (1, 200, 0),
     (2, 20, 30),
     (3, 30, 20),
     (4, 40, 20),
@@ -55,8 +55,11 @@ SEARCH_SPACE = {
             'protein_downscale_nonlinearity', 
             ['relu', 'silu', 'tanh']),
         'protein_maxpool': hp.choice('protein_maxpool', [True, False]),
+        'protein_attention_layers': hp.quniform('att_layers', 1, 5, 1),
+        'protein_attention_heads': hp.quniform('att_heads', 4, 16, 4),
+        'protein_attention_window': hp.quniform('att_window', 1, 7, 2),
         'context_dim': hp.quniform('context_dim', 64, 512, 64),
-        'negotiation_passes': hp.quniform('negotiation_passes', 1, 8, 1)
+        'negotiation_passes': hp.quniform('negotiation_passes', 1, 8, 1),
     }
 
 NUM_NODES = 6
@@ -304,6 +307,8 @@ def create_suggestion_box(docs):
 #     return trials.new_trial_docs([])
 def run_optimization(level=1):
     print(f"Optimizing at level {level}")
+
+    set_random_seeds(4)
 
     next_lvl_trials = MongoTrials('mongo://localhost:1234/covid/jobs', exp_key=f'covid-{level+1}')
     if len(next_lvl_trials.trials) > 0:

@@ -28,10 +28,15 @@ class ResidualBlock(nn.Module):
     def __init__(self, block, nonlinearity='silu'):
         super().__init__()
         self.model_layer = block
+        
         if isinstance(nonlinearity, nn.Module):
             self._nonlinearity = nonlinearity
+        elif nonlinearity is None:
+            self._nonlinearity = None
         else:
             self._nonlinearity = NONLINEARITIES[nonlinearity]()
         
     def forward(self, x, *args, **kwargs):
-        return self._nonlinearity(x + self.model_layer(x, *args, **kwargs))
+        act = self._nonlinearity if self._nonlinearity is not None else (lambda x: x)
+
+        return x + act(self.model_layer(act(x), *args, **kwargs))

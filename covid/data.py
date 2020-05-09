@@ -11,6 +11,7 @@ import chemprop.features
 
 from torch.nn.modules import pooling 
 from torch.nn.modules.conv import _ConvNd
+import types
 
 __ALL__ = [
     'ProteinBatch', 
@@ -82,6 +83,14 @@ class ProteinBatch(object):
     @property
     def batch_offsets(self):
         return self._batch_offsets
+
+    @property
+    def batch_size(self):
+        return len(self._batch_lengths)
+
+    @property
+    def num_channels(self):
+        return self._data.shape[1]
         
     def broadcast_like(self, other):
         if not isinstance(other, ProteinBatch):
@@ -89,27 +98,52 @@ class ProteinBatch(object):
                 return self
             raise ValueError("Can't broadcast to " + repr(other))
             
-        if (other.data.shape == self.data.shape
-                and len(other.batch_lengths) == len(self.batch_lengths)
-                and all(x == y for x, y in zip(other.batch_lengths, self.batch_lengths))
+        if len(other.batch_lengths) != len(self.batch_lengths):
+            raise ValueError("Can't broadcast different batch sizes together")
+        
+        if any(x != y for x,y in zip(self._batch_lengths, other._batch_lengths)):
+            raise ValueError("Can't broadcast different length sequences in ProteinBatch objects")
+
+        # If it's identical, nothing to do
+        if (all(x == y or (x == 1 or y == 1) for x,y in zip(other.data.shape, self.data.shape))
                 and all(x == y for x, y in zip(other.batch_offsets, self.batch_offsets))):
             return self
             
-        if any(x != y for x,y in zip(self._batch_lengths, other._batch_lengths)):
-            raise ValueError("Can't broadcast different length sequences in ProteinBatch objects")
-            
-        new_data = T.zeros_like(other.data)
+        broadcast_shape = (
+            other.data.shape[0], 
+            1 if self.num_channels == 1 else other.data.shape[1], 
+            other.data.shape[2]
+        )
+
+        new_data = T.zeros(
+            broadcast_shape, dtype=other.data.dtype, layout=other.data.layout, device=other.data.device
+        )
+
         for from_off, length, to_off in zip(self._batch_offsets, self._batch_lengths, other._batch_offsets):
             new_data[:,:,to_off:(to_off+length)] = self.data[:,:,from_off:(from_off+length)]
             
         return ProteinBatch(new_data, other._batch_offsets, other._batch_lengths)
         
-    def _batchwise_apply(self, other, func):
+    def batchwise_apply(self, func, *args, output_protein = True, **kwargs):
+        def get_arg_batch(arg, i):
+            if isinstance(arg, (T.Tensor, ProteinBatch)):
+                return arg[i:(i+1)]
+            if isinstance(arg, (list, tuple)) and len(arg) == self.batch_size:
+                return arg[i:(i+1)]
+            return arg
+
         pieces = [
-            func(self.data[0,:,start:(start+length)], other[i])
+            func(
+                self.data[:,:,start:(start+length)], 
+                *[get_arg_batch(x, i) for x in args],
+                **{k:get_arg_batch(v, i) for k,v in kwargs.items()}
+            )
             for i, (start, length) in enumerate(zip(self.batch_offsets, self.batch_lengths))
         ]
-        return create_protein_batch(pieces)
+        
+        if output_protein:
+            return create_protein_batch(pieces)
+        return T.cat(pieces, 0)
 
     def _operator(self, other, func):
         if isinstance(other, ProteinBatch):
@@ -122,7 +156,7 @@ class ProteinBatch(object):
             except:
                 pass
 
-        return self._batchwise_apply(other, func)
+        return self.batchwise_apply(func, other)
 
     def __repr__(self):
         return f"<ProteinBatch[{len(self.batch_lengths)}]({self.data.shape}) offsets={self.batch_offsets}, lengths={self.batch_lengths}>"

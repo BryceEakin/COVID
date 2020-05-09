@@ -23,6 +23,7 @@ if is_notebook():
 else:
     from tqdm import tqdm
 
+
 def initialize_logger(run_name,
                       output_dir='./logs', 
                       print_lvl = logging.INFO, 
@@ -65,7 +66,7 @@ class CovidTrainingConfiguration():
     batch_size: int = 32
     training_fold: typ.Union[int, None] = 0
     max_epochs: int = 100
-    validation_frequency: float = 0.2
+    validation_frequency: float = 0.1
     verbosity: int = logging.INFO
 
     device: str = 'cuda'
@@ -92,7 +93,7 @@ class CovidTrainingConfiguration():
     optim_minimum_lr: float = 1e-7
 
     # Model hyperparameters
-    chem_layers_per_message: int = 2
+    chem_layers_per_message: int = 1
     chem_messages_per_pass: int = 2
     chem_hidden_size: int = 128
     chem_bias: bool = False
@@ -100,18 +101,23 @@ class CovidTrainingConfiguration():
     chem_undirected: bool = False
     chem_atom_messages: bool = False
 
-    protein_base_dim: int = 32
-    protein_output_dim: int = 256
+    protein_base_dim: int = 16
+    protein_output_dim: int = 128
     protein_nonlinearity: str = 'silu'
     protein_downscale_nonlinearity: str = 'tanh'
     protein_maxpool: bool = True
+    protein_attention_layers: int = 3
+    protein_attention_heads: int = 8
+    protein_attention_window: int = 1
+    protein_output_use_attention: bool = True
+    protein_output_attention_heads: int = 16
 
-    dropout_rate: float = 0.4
-    context_dim: int = 256
-    negotiation_passes: int = 3
+    dropout_rate: float = 0.2
+    context_dim: int = 128
+    negotiation_passes: int = 2
     
 
-def _set_random_seeds(seed = 4):
+def set_random_seeds(seed = 4):
     logging.debug(f"Random seeds set: {seed}")
     np.random.seed(seed)
     random.seed(seed)
@@ -119,7 +125,7 @@ def _set_random_seeds(seed = 4):
 
 
 def _create_all_data_splits(root):
-    _set_random_seeds(4) # Always split data with consistent random seed
+    set_random_seeds(4) # Always split data with consistent random seed
     logging.info("Creating data splits -- global training/holdout")
     create_data_split(
         os.path.join(root, 'data'), 
@@ -153,8 +159,13 @@ def _create_model(config):
         config.protein_nonlinearity,
         config.protein_downscale_nonlinearity,
         config.protein_maxpool,
+        config.protein_attention_layers,
+        config.protein_attention_heads,
+        config.protein_attention_window,
+        config.protein_output_use_attention,
+        config.protein_output_attention_heads,
         config.negotiation_passes,
-        config.context_dim
+        config.context_dim,
     )
     return model
 
@@ -191,7 +202,7 @@ def _create_dataloaders(config, validation_synth_neg_rate = 0.0):
         config.batch_size, 
         drop_last=True,
         neg_rate = config.synthetic_negative_rate, 
-        num_workers = config.dataloader_num_workers
+        num_workers = config.dataloader_num_workers,
     )
 
     validation_data = StitchDataset(os.path.join(config.root_folder, f'data/valid_{config.training_fold:02}'))
@@ -200,7 +211,8 @@ def _create_dataloaders(config, validation_synth_neg_rate = 0.0):
         config.batch_size, 
         drop_last=True,
         neg_rate=validation_synth_neg_rate, 
-        num_workers=config.dataloader_num_workers
+        num_workers=config.dataloader_num_workers,
+        sample_size = config.batch_size * 50
     )
 
     return dataloader, validation_dataloader
@@ -230,7 +242,7 @@ def train_model(config:CovidTrainingConfiguration,
         _create_all_data_splits(config.root_folder)
 
     # Set random seeds for reproducibility
-    _set_random_seeds(config.random_seed)
+    set_random_seeds(config.random_seed)
     
     # Create and initialize model
     model = _create_model(config)

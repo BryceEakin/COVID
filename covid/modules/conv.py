@@ -54,22 +54,30 @@ class DownscaleConv1d(nn.Module):
             
         return self._nonlinearity(out)
 
-def create_resnet_block_1d(in_channels, inner_channels, inner_kernel=3, for_protein_batch = False, nonlinearity='silu'):
+def create_resnet_block_1d(in_channels, 
+                           inner_channels, 
+                           inner_kernel=3, 
+                           for_protein_batch = False, 
+                           nonlinearity='silu',
+                           norm='batch'):
     wrap = (lambda x: x) if not for_protein_batch else apply_to_protein_batch
     
     if not isinstance(inner_kernel, tuple):
         inner_kernel = (inner_kernel, )
+
+    if norm == 'batch':
+        norm_layer = nn.BatchNorm1d(in_channels)
+    elif norm == 'instance':
+        norm_layer = nn.InstanceNorm1d(in_channels)
+    else:
+        raise ValueError("Only 'batch' and 'instance' are supported at present")
         
     inner = wrap(nn.Sequential(
+        norm_layer,
+        NONLINEARITIES[nonlinearity](),
         nn.Conv1d(in_channels, inner_channels, 1),
         nn.Conv1d(inner_channels,inner_channels, inner_kernel, padding=tuple((x-1)//2 for x in inner_kernel)),
         nn.Conv1d(inner_channels, in_channels, 1)
     ))
 
-    for p in inner.parameters():
-        if len(p.data.shape) > 1:
-            nn.init.xavier_normal_(p.data)
-        else:
-            nn.init.normal_(p.data)
-
-    return ResidualBlock(inner, nonlinearity = wrap(NONLINEARITIES[nonlinearity]()))
+    return ResidualBlock(inner, nonlinearity = None)
