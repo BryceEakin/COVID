@@ -53,8 +53,11 @@ SEARCH_SPACE = {
             'protein_downscale_nonlinearity', 
             ['relu', 'silu', 'tanh']),
         'protein_maxpool': hp.choice('protein_maxpool', [True, False]),
+        'protein_attention_layers': hp.quniform('att_layers', 1, 5, 1),
+        'protein_attention_heads': hp.quniform('att_heads', 4, 16, 4),
+        'protein_attention_window': hp.quniform('att_window', 1, 7, 2),
         'context_dim': hp.quniform('context_dim', 64, 512, 64),
-        'negotiation_passes': hp.quniform('negotiation_passes', 1, 8, 1)
+        'negotiation_passes': hp.quniform('negotiation_passes', 1, 8, 1),
     }
 
 def fig_to_base64(fig, close=False, **save_kwargs):
