@@ -315,6 +315,7 @@ def train_model(config:CovidTrainingConfiguration,
             config.root_folder, 
             f"outputs/{run_name}_epoch00_validation_result.csv.gz"
         ), index=False)
+        logging.info(f"Validation loss at {epoch:0.1f} = {vloss:0.4f}")
         validation_stats.append([0, vloss, vacc, v_conf])
 
     epoch_length = len(dataloader)
@@ -364,7 +365,7 @@ def train_model(config:CovidTrainingConfiguration,
                 ), index=False)
 
                 validation_stats.append([epoch+pct_epoch, vloss, vacc, v_conf])
-                
+                logging.info(f"Validation loss at {epoch+pct_epoch:0.1f} = {vloss:0.4f}")
                 scheduler.step(vloss)
 
                 fig = get_performance_plots(losses, validation_stats)

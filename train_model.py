@@ -17,7 +17,6 @@ if __name__ == '__main__':
     config.verbosity = logging.DEBUG
 
     config.optim_adam_betas = (0.992, 0.9995)
-    
 
     if os.name == 'nt':
         run_thread = threading.Thread(
