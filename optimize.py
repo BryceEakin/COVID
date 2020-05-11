@@ -32,12 +32,12 @@ LEVEL_DEFS = [
 ]
 
 SEARCH_SPACE = {
-        'synthetic_negative_rate': hp.uniform('neg_rate', 0, 0.5),
+        'synthetic_negative_rate': hp.quniform('neg_rate', 0.1, 0.5, 0.1),
         'optim_initial_lr': 10 ** -hp.quniform('lr_exp', 3, 6, 0.25),
         'adam_beta1': 1-hp.loguniform('inv_beta1', -6, -1),
         'adam_beta2': 1-hp.loguniform('inv_beta2', -8, -4),
         'optim_adam_eps': hp.loguniform('eps', -15, 0),
-        'dropout_rate': hp.uniform('dropout_rate', 0.05, 0.5),
+        'dropout_rate': hp.quniform('dropout_rate', 0.1, 0.5, 0.1),
         'chem_layers_per_message': hp.quniform('chem_layers_per_message', 1,4,1),
         'chem_messages_per_pass': hp.quniform('chem_messages_per_pass', 1,4,1),
         'chem_hidden_size': hp.quniform('chem_hidden_size', 64,384,64),
@@ -46,7 +46,7 @@ SEARCH_SPACE = {
             ['ReLU', 'LeakyReLU', 'tanh']),
         'chem_bias': hp.choice('chem_bias', [True, False]),
         'chem_mode': hp.choice('chem_mode', ['atom', 'bond', 'bond-undirected']),
-        'protein_base_dim': hp.quniform('protien_base_dim', 16,80,16),
+        'protein_base_dim': hp.quniform('protien_base_dim', 16, 80, 16),
         'protein_output_dim': hp.quniform('protein_out_dim', 64, 384, 64),
         'protein_nonlinearity': hp.choice(
             'protein_nonlinearity', 
@@ -55,11 +55,11 @@ SEARCH_SPACE = {
             'protein_downscale_nonlinearity', 
             ['relu', 'silu', 'tanh']),
         'protein_maxpool': hp.choice('protein_maxpool', [True, False]),
-        'protein_attention_layers': hp.quniform('att_layers', 1, 5, 1),
-        'protein_attention_heads': hp.quniform('att_heads', 4, 16, 4),
-        'protein_attention_window': hp.quniform('att_window', 0, 6, 2) + 1,
+        'protein_attention_layers': hp.quniform('att_layers', 1, 3, 1),
+        'protein_attention_heads': hp.quniform('att_heads', 4, 12, 4),
+        'protein_attention_window': hp.quniform('att_window', 0, 2, 2) + 1,
         'context_dim': hp.quniform('context_dim', 64, 512, 64),
-        'negotiation_passes': hp.quniform('negotiation_passes', 1, 8, 1),
+        'negotiation_passes': hp.quniform('negotiation_passes', 1, 4, 1),
     }
 
 NUM_NODES = 6

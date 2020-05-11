@@ -53,7 +53,8 @@ def plot_loss(ax, loss_x, loss_y, valid_x, valid_y, period=None):
     ax.plot(x, y, label='model (validation)', c='C1')
 
     ax.plot((x[0], x[-1]), (0.422, 0.422), c='g', ls=':', lw=1.5, label='random baseline')
-    ax.set_ylim((0.0, 0.6))
+    ax.set_ylim((0.0, 1.0))
+    ax.legend()
     ax.set_ylabel('Loss')
 
 def plot_learning_rate(ax, lr_x, lr_y):
@@ -61,7 +62,8 @@ def plot_learning_rate(ax, lr_x, lr_y):
     ax.set_yscale('log')
     ax.plot(lr_x, lr_y, ls=':', lw=1.0, c='darkturquoise', label='lr (right axis)')
     ax.set_ylim((1e-8, 1e-4))
-    ax.set_ylabel("Learning Rate")
+    #ax.set_ylabel("Learning Rate")
+    ax.legend()
 
 def plot_stat(ax, x, stat, title, ylim=(0.0,1.0)):
     for i, name in enumerate(MODE_NAMES):
@@ -101,8 +103,6 @@ def get_performance_plots(losses, validation_stats, learning_rates = None, perio
         if learning_rates is not None:
             lr_x, lr_y = zip(*learning_rates)
             plot_learning_rate(axes[0,0], lr_x, lr_y)
-
-        axes[0,0].legend()
 
         stats = get_performance_stats(validation_stats)
         valid_x = stats['epoch']

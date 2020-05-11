@@ -33,6 +33,7 @@ def initialize_logger(run_name,
     if not os.path.exists("./logs"):
         os.mkdir("./logs")
 
+    logging.getLogger('covid')
     logger.setLevel(logging.DEBUG)
      
     handlers = []

@@ -60,7 +60,8 @@ class ScaleSafeBatchNorm1d(nn.BatchNorm1d):
 
         # Normal dist for comparison
         self.register_buffer(
-            'buckets_ref', T.tensor(
+            'buckets_ref', 
+            T.tensor(
                 [0.003, 0.0092, 0.028, 0.066, 0.121, 0.175, 0.197, 0.175, 0.121, 0.066, 0.028, 0.0092, 0.003]
             ).unsqueeze(-1)
         )
