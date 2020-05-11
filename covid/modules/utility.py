@@ -1,3 +1,4 @@
+import torch as T
 from torch import nn
 from ..functions import silu
 
@@ -40,3 +41,10 @@ class ResidualBlock(nn.Module):
         act = self._nonlinearity if self._nonlinearity is not None else (lambda x: x)
 
         return x + act(self.model_layer(act(x), *args, **kwargs))
+
+class ScaleSafeBatchNorm1d(nn.BatchNorm1d):
+    def forward(self, x:T.Tensor):
+        x = T.max(x, self.running_mean - self.running_var * 5)
+        x = T.min(x, self.running_mean + self.running_var * 5)
+
+        return super().forward(x)

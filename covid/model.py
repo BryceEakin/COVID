@@ -5,11 +5,12 @@ import torch as T
 import torch.nn.functional as F
 from torch import nn
 
-from .data import ProteinBatchToPaddedBatch, apply_to_protein_batch
+from .data import ProteinBatchToPaddedBatch, apply_to_protein_batch, ProteinBatch
 from .modules import (NONLINEARITIES, create_chemical_models,
                       create_protein_models)
-from .modules.utility import SiLU
+from .modules.utility import SiLU, ScaleSafeBatchNorm1d
 import logging
+import pdb
 
 __all__ = [
     "CovidModel",
@@ -41,6 +42,7 @@ class CovidModel(nn.Module):
                  negotiation_passes:int = 3,
                  context_dim:int = 256,
                  output_dim:int = 5,
+                 debug=True
                  ):
         super().__init__()
         
@@ -55,11 +57,11 @@ class CovidModel(nn.Module):
             atom_messages=chem_atom_messages,
             messages_per_pass=chem_messages_per_pass
         )
-        
+
         raw_context_size = chem_mol_feature_dim + chem_hidden_size + protein_output_dim
 
         self.context_model = nn.Sequential(
-            nn.BatchNorm1d(raw_context_size),
+            ScaleSafeBatchNorm1d(raw_context_size),
             nn.Dropout(dropout),
             nn.ReLU(),
             nn.Linear(raw_context_size, raw_context_size),
@@ -100,8 +102,32 @@ class CovidModel(nn.Module):
         )
 
         self.num_passes = negotiation_passes
+
+        self.last_debug_checks = []
+        self.debug = debug
         
+    def _do_debug_check(self, name, x):
+        if not self.debug:
+            return
+
+        if isinstance(x, ProteinBatch):
+            self.last_debug_checks.append((name, T.isfinite(x._data).all()))
+        elif isinstance(x, T.Tensor):
+            self.last_debug_checks.append((name, T.isfinite(x).all()))
+        elif isinstance(x, (tuple, list)):
+            for i, el in enumerate(x):
+                self._do_debug_check(f"{name}[{i}]", el)
+
+
     def forward(self, chem_batch, chem_f_batch, protein_batch):
+        self.last_debug_checks = []
+
+        self._do_debug_check('chem_f_batch', chem_f_batch)
+        self._do_debug_check('protein_batch', protein_batch)
+
+        # chem_f_batch = self.chem_features_norm(chem_f_batch)
+        # self._do_debug_check('normalized chem_f_batch', chem_f_batch)
+
         chem_state = self.chem_head_model(chem_batch)
         protein_state = self.protein_head_model(protein_batch)
 
@@ -111,8 +137,14 @@ class CovidModel(nn.Module):
                 chem_f_batch[~T.isfinite(chem_f_batch)] = 0.0
 
         for i in range(self.num_passes + 1):
-            protein_context = self.protein_tail_model(protein_state)
+            self._do_debug_check(f'chem_state[{i}]', chem_state)
+            self._do_debug_check(f'protein_state[{i}]', protein_state)
+
             chem_context = self.chem_tail_model(chem_state)
+            protein_context = self.protein_tail_model(protein_state)
+
+            self._do_debug_check(f'chem_context[{i}]', chem_context)
+            self._do_debug_check(f'protein_context[{i}]', protein_context)
 
             if (~T.isfinite(protein_context)).any():
                 logging.debug("Protein context invalid!")
@@ -124,7 +156,7 @@ class CovidModel(nn.Module):
                 with T.no_grad():
                     chem_context[~T.isfinite(chem_context)] = 0.0
 
-            context = T.cat((
+            raw_context = T.cat((
                 chem_context,
                 chem_f_batch,
                 protein_context
@@ -133,12 +165,13 @@ class CovidModel(nn.Module):
             if i == self.num_passes:
                 break
 
-            context = self.context_model(context)
+            context = self.context_model(raw_context)
+            self._do_debug_check(f'combined context[{i}]', context)
 
             chem_state = self.chem_middle_model(chem_state, context)
             protein_state = self.protein_middle_model(protein_state, context)
 
-        return self.final_layers(context)
+        return self.final_layers(raw_context)
 
 
 class RandomModel(nn.Module):
@@ -165,13 +198,16 @@ def run_model(model, batch, device, mask_nonfinite=True):
     proteins = proteins.to(device)
 
     weights = (target * 0.0015).clamp(1e-3, 1.0)
-    weights[target == 0] = 0.5
+    weights[target == 0] = 1.0 #0.5
     weights = weights.to(device)
     
     target = (1.0*(target > 0)).to(device)
     
     result = model(chem_graphs, chem_features, proteins)
     
+    if (~T.isfinite(result)).any():
+        pdb.set_trace()
+
     if (~T.isfinite(result)).any() and mask_nonfinite:
         logging.debug("Non-finite model output!  CLearing affected batches.")
         print(result)

@@ -3,7 +3,7 @@ import functools
 import torch as T
 from torch import nn
 
-from ..data import ProteinBatchToPaddedBatch, apply_to_protein_batch
+from ..data import ProteinBatchToPaddedBatch, apply_to_protein_batch, ProteinBatch
 from .conv import DownscaleConv1d, create_resnet_block_1d
 from .utility import NONLINEARITIES, ResidualBlock, Squeeze
 
@@ -29,28 +29,22 @@ class ProteinMHAttentionTransformer(ProteinMultiheadAttention):
     def __init__(self, num_channels, num_heads, window):
         super().__init__(num_channels, num_heads, window)
 
-        self.result_transforms = nn.ModuleList([
-            apply_to_protein_batch(
-                nn.Conv1d(num_channels, num_channels, (1, ), 1, 0)
-            ) for _ in range(num_heads)
-        ])
+        self.result_transform = nn.Conv1d(
+            num_channels * num_heads, num_channels * num_heads, (1, ), 1, 0, groups=num_heads
+        )
 
     def forward(self, x):
         focuses = super().forward(x)
 
-        result = None
+        # Create B x (Heads x Channels) x L attention-data tensor
+        focused_data = T.flatten(focuses._data.unsqueeze(2) * x._data.unsqueeze(1), 1, 2)
 
-        for head_idx, transform in enumerate(self.result_transforms):
-            head_result = transform(
-                focuses[(slice(None), slice(head_idx, head_idx+1), slice(None))] * x
-            )
+        # Transform the tensor and sum along the 'heads' dimention
+        transform_result = self.result_transform(focused_data.contiguous()).view(
+            1, focuses.num_channels, x.num_channels, x._data.shape[-1]
+        ).sum(1).contiguous()
 
-            if result is None:
-                result = head_result
-            else:
-                result = result + head_result
-
-        return result
+        return ProteinBatch(transform_result, x.batch_offsets, x.batch_lengths)
 
 class ProteinMHAttentionSummarizer(ProteinMultiheadAttention):
     def __init__(self, num_channels, num_heads, window, reduce='max'):

@@ -18,7 +18,7 @@ if __name__ == '__main__':
 
     config.optim_adam_betas = (0.992, 0.9995)
 
-    if os.name == 'nt':
+    if os.name == 'nt' and False:
         run_thread = threading.Thread(
             target=train_model, 
             args=[config], 

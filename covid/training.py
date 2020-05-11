@@ -78,7 +78,7 @@ class CovidTrainingConfiguration():
     )
 
     # Dataset Configuration
-    synthetic_negative_rate: float = 0.2
+    synthetic_negative_rate: float = 0.25
     dataloader_num_workers: int = 1
 
     # Optimizer Configuration
@@ -94,26 +94,26 @@ class CovidTrainingConfiguration():
 
     # Model hyperparameters
     chem_layers_per_message: int = 1
-    chem_messages_per_pass: int = 2
-    chem_hidden_size: int = 128
+    chem_messages_per_pass: int = 1
+    chem_hidden_size: int = 64
     chem_bias: bool = False
     chem_nonlinearity: str = 'ReLU'
     chem_undirected: bool = False
     chem_atom_messages: bool = False
 
-    protein_base_dim: int = 16
+    protein_base_dim: int = 8
     protein_output_dim: int = 128
     protein_nonlinearity: str = 'silu'
     protein_downscale_nonlinearity: str = 'tanh'
     protein_maxpool: bool = True
-    protein_attention_layers: int = 3
-    protein_attention_heads: int = 8
+    protein_attention_layers: int = 1
+    protein_attention_heads: int = 4
     protein_attention_window: int = 1
     protein_output_use_attention: bool = True
-    protein_output_attention_heads: int = 16
+    protein_output_attention_heads: int = 4
 
-    dropout_rate: float = 0.2
-    context_dim: int = 128
+    dropout_rate: float = 0.4
+    context_dim: int = 32
     negotiation_passes: int = 2
     
 
