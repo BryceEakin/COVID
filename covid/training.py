@@ -142,7 +142,7 @@ def _create_all_data_splits(root):
         )
 
 
-def _create_model(config):
+def _create_model(config, debug=False):
     logging.debug("Creating model")
     model = CovidModel(
         config.dropout_rate,
@@ -166,6 +166,7 @@ def _create_model(config):
         config.protein_output_attention_heads,
         config.negotiation_passes,
         config.context_dim,
+        debug=debug
     )
     return model
 
@@ -222,7 +223,8 @@ def train_model(config:CovidTrainingConfiguration,
                 disable_training_resume:bool=False,
                 run_name:str=None,
                 check_interrupted:typ.Callable=None,
-                disable_checkpointing:bool=False):
+                disable_checkpointing:bool=False,
+                debug:bool=False):
     
     if run_name is None:
         run_name = f"train_fold{config.training_fold:02}" if config.training_fold is not None else "train_global"
@@ -245,7 +247,7 @@ def train_model(config:CovidTrainingConfiguration,
     set_random_seeds(config.random_seed)
     
     # Create and initialize model
-    model = _create_model(config)
+    model = _create_model(config, debug)
     
     logging.debug("Pushing model to device")
     model.to(config.device)
