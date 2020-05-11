@@ -27,6 +27,8 @@ from collections import Counter, defaultdict
 from pprint import pformat
 import humanize
 
+logger = logging.getLogger(__name__)
+
 PORT = 5535
 
 SEARCH_SPACE = {
@@ -79,7 +81,7 @@ TRIALS = MongoTrials('mongo://localhost:1234/covid/jobs')
 
 @app.get("/training-state/<run_id>")
 async def get_training_state(request, run_id):
-    logging.info(f"Looking for \"./training_state/{run_id}__state.pkl.gz\"")
+    logger.info(f"Looking for \"./training_state/{run_id}__state.pkl.gz\"")
     if os.path.exists(f"./training_state/{run_id}__state.pkl.gz"):
         return await file_stream(
             f"./training_state/{run_id}__state.pkl.gz",

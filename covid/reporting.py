@@ -53,8 +53,15 @@ def plot_loss(ax, loss_x, loss_y, valid_x, valid_y, period=None):
     ax.plot(x, y, label='model (validation)', c='C1')
 
     ax.plot((x[0], x[-1]), (0.422, 0.422), c='g', ls=':', lw=1.5, label='random baseline')
-    ax.legend()
     ax.set_ylim((0.0, 0.6))
+    ax.set_ylabel('Loss')
+
+def plot_learning_rate(ax, lr_x, lr_y):
+    ax = ax.twinx()
+    ax.set_yscale('log')
+    ax.plot(lr_x, lr_y, ls=':', lw=1.0, c='darkturquoise', label='lr (right axis)')
+    ax.set_ylim((1e-8, 1e-4))
+    ax.set_ylabel("Learning Rate")
 
 def plot_stat(ax, x, stat, title, ylim=(0.0,1.0)):
     for i, name in enumerate(MODE_NAMES):
@@ -82,7 +89,7 @@ def get_performance_stats(validation_stats):
         'mcc': mcc
     }
 
-def get_performance_plots(losses, validation_stats, period=None):
+def get_performance_plots(losses, validation_stats, learning_rates = None, period=None):
     loss_x, loss_y = zip(*losses)
     valid_x, valid_y, valid_acc, valid_conf = zip(*validation_stats)
     
@@ -90,7 +97,12 @@ def get_performance_plots(losses, validation_stats, period=None):
         fig, axes = plt.subplots(ncols=2, nrows=3, figsize=(12,12))
         
         plot_loss(axes[0,0], loss_x, loss_y, valid_x, valid_y, period)
-        axes[0,0].set_ylabel('Loss')
+        
+        if learning_rates is not None:
+            lr_x, lr_y = zip(*learning_rates)
+            plot_learning_rate(axes[0,0], lr_x, lr_y)
+
+        axes[0,0].legend()
 
         stats = get_performance_stats(validation_stats)
         valid_x = stats['epoch']

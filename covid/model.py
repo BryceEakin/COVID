@@ -12,12 +12,13 @@ from .modules.utility import SiLU, ScaleSafeBatchNorm1d
 import logging
 import pdb
 
+logger = logging.getLogger(__name__)
+
 __all__ = [
     "CovidModel",
     "RandomModel",
     'run_model',
 ]
-
 class CovidModel(nn.Module):
     def __init__(self,
                  dropout:float = 0.2,
@@ -132,7 +133,7 @@ class CovidModel(nn.Module):
         protein_state = self.protein_head_model(protein_batch)
 
         if (~T.isfinite(chem_f_batch)).any():
-            logging.debug("Encountered non-finite values in chem feature batch")
+            logger.debug("Encountered non-finite values in chem feature batch")
             with T.no_grad():
                 chem_f_batch[~T.isfinite(chem_f_batch)] = 0.0
 
@@ -147,12 +148,12 @@ class CovidModel(nn.Module):
             self._do_debug_check(f'protein_context[{i}]', protein_context)
 
             if (~T.isfinite(protein_context)).any():
-                logging.debug("Protein context invalid!")
+                logger.debug("Protein context invalid!")
                 with T.no_grad():
                     protein_context[~T.isfinite(protein_context)] = 0.0
 
             if (~T.isfinite(chem_context)).any():
-                logging.debug("Chemical context invalid!")
+                logger.debug("Chemical context invalid!")
                 with T.no_grad():
                     chem_context[~T.isfinite(chem_context)] = 0.0
 
@@ -209,7 +210,7 @@ def run_model(model, batch, device, mask_nonfinite=True):
         pdb.set_trace()
 
     if (~T.isfinite(result)).any() and mask_nonfinite:
-        logging.debug("Non-finite model output!  CLearing affected batches.")
+        logger.debug("Non-finite model output!  CLearing affected batches.")
         print(result)
 
         result = T.cat([

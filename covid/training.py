@@ -23,6 +23,8 @@ if is_notebook():
 else:
     from tqdm import tqdm
 
+logger = logging.getLogger(__name__)
+
 
 def initialize_logger(run_name,
                       output_dir='./logs', 
@@ -31,7 +33,6 @@ def initialize_logger(run_name,
     if not os.path.exists("./logs"):
         os.mkdir("./logs")
 
-    logger = logging.getLogger()
     logger.setLevel(logging.DEBUG)
      
     handlers = []
@@ -118,7 +119,7 @@ class CovidTrainingConfiguration():
     
 
 def set_random_seeds(seed = 4):
-    logging.debug(f"Random seeds set: {seed}")
+    logger.debug(f"Random seeds set: {seed}")
     np.random.seed(seed)
     random.seed(seed)
     T.manual_seed(seed)
@@ -126,7 +127,7 @@ def set_random_seeds(seed = 4):
 
 def _create_all_data_splits(root):
     set_random_seeds(4) # Always split data with consistent random seed
-    logging.info("Creating data splits -- global training/holdout")
+    logger.info("Creating data splits -- global training/holdout")
     create_data_split(
         os.path.join(root, 'data'), 
         os.path.join(root, 'data/training'), 
@@ -134,7 +135,7 @@ def _create_all_data_splits(root):
     )
     
     for i in range(10):
-        logging.info(f"Creating data splits -- train/validation {i:02}")
+        logger.info(f"Creating data splits -- train/validation {i:02}")
         create_data_split(
             os.path.join(root, 'data/training'),
             os.path.join(root, f'data/train_{i:02}'), 
@@ -143,7 +144,7 @@ def _create_all_data_splits(root):
 
 
 def _create_model(config, debug=False):
-    logging.debug("Creating model")
+    logger.debug("Creating model")
     model = CovidModel(
         config.dropout_rate,
         config.chem_nonlinearity,
@@ -172,7 +173,7 @@ def _create_model(config, debug=False):
 
 
 def _create_optimizer_and_schedulers(model, config):
-    logging.debug("Initializing optimizers/schedulers")
+    logger.debug("Initializing optimizers/schedulers")
 
     optim = T.optim.Adam(
         model.parameters(), 
@@ -196,7 +197,7 @@ def _create_optimizer_and_schedulers(model, config):
 
 
 def _create_dataloaders(config, validation_synth_neg_rate = 0.0):
-    logging.debug("Initializing Datasets")
+    logger.debug("Initializing Datasets")
     data = StitchDataset(os.path.join(config.root_folder, f'data/train_{config.training_fold:02}'))
     dataloader = create_dataloader(
         data, 
@@ -231,10 +232,10 @@ def train_model(config:CovidTrainingConfiguration,
 
     logging_handlers = initialize_logger(run_name, print_lvl=config.verbosity)
 
-    logging.info(f"Training initializing -- {run_name}")
+    logger.info(f"Training initializing -- {run_name}")
     
     if config.training_fold is None:
-        logging.warning("Note: You are training this model on the full training data!")
+        logger.warning("Note: You are training this model on the full training data!")
 
     if not os.path.exists(os.path.join(config.root_folder, 'data/training')):
         # Create data splits if they haven't been computed
@@ -249,7 +250,7 @@ def train_model(config:CovidTrainingConfiguration,
     # Create and initialize model
     model = _create_model(config, debug)
     
-    logging.debug("Pushing model to device")
+    logger.debug("Pushing model to device")
     model.to(config.device)
 
     # Create dataloaders
@@ -272,28 +273,30 @@ def train_model(config:CovidTrainingConfiguration,
 
     epoch = 0
     losses = []
+    learning_rates = []
     validation_stats = []
     last_validation = 0
 
     state = None
 
     if os.path.exists(training_state_path) and not disable_training_resume:
-        logging.info("Loading previous training state")
+        logger.info("Loading previous training state")
         state = T.load(training_state_path, map_location=config.device)
 
     elif os.path.exists(training_state_path + '.gz') and not disable_training_resume:
-        logging.info("Loading previous training state")
+        logger.info("Loading previous training state")
         try:
             with gzip.open(training_state_path + '.gz', 'rb') as f:
                 state = T.load(f, map_location=config.device)
         except:
             state = None
-            logging.info("Previous state corrupt -- training from scratch")
+            logger.info("Previous state corrupt -- training from scratch")
             os.remove(training_state_path + '.gz')
 
     if state is not None:
         epoch = state.get('epoch', epoch-1) + 1
         losses = state.get('losses', losses)
+        learning_rates = state.get('learning_rates', learning_rates)
         validation_stats = state.get('validation_stats', validation_stats)
         last_validation = state.get('last_validation', last_validation)
         model.load_state_dict(state['model'])
@@ -302,9 +305,9 @@ def train_model(config:CovidTrainingConfiguration,
         if 'scheduler' in state:
             scheduler.load_state_dict(state['scheduler'])
     elif disable_training_resume:
-        logging.info("Resuming from previous training state manually disabled")
+        logger.info("Resuming from previous training state manually disabled")
     else:
-        logging.info("No previous training state to load")
+        logger.info("No previous training state to load")
 
     # make required subfolders
     for folder in ['outputs', 'models', 'checkpoints', 'training_state']:
@@ -317,14 +320,15 @@ def train_model(config:CovidTrainingConfiguration,
             config.root_folder, 
             f"outputs/{run_name}_epoch00_validation_result.csv.gz"
         ), index=False)
-        logging.info(f"Validation loss at {epoch:0.1f} = {vloss:0.4f}")
+        logger.info(f"Validation loss at {epoch:0.1f} = {vloss:0.4f}")
         validation_stats.append([0, vloss, vacc, v_conf])
+        learning_rates.append((0, optim.param_groups[0]['lr']))
 
     epoch_length = len(dataloader)
     interrupted = False
 
     for epoch in tqdm(range(epoch, config.max_epochs)):
-        logging.info(f"Beginning epoch {epoch}")
+        logger.info(f"Beginning epoch {epoch}")
         
         pct_epoch = 0
         model.train()
@@ -332,14 +336,14 @@ def train_model(config:CovidTrainingConfiguration,
 
         for m_e, m_v in config.early_stop_milestones:
             if m_e <= epoch and all(v[1] > m_v for v in validation_stats):
-                logging.info(f"Failed to meet early stopping milestone ({m_e}, {m_v}) -- stopping")
+                logger.info(f"Failed to meet early stopping milestone ({m_e}, {m_v}) -- stopping")
                 early_stop = True
                 break
 
         if epoch >= config.early_stop_min_epochs and (
             optim.param_groups[0]['lr'] <= config.optim_minimum_lr + 1e-9 or early_stop
         ):
-            logging.info("Stopping early")
+            logger.info("Stopping early")
             break
 
         for idx, batch in enumerate(tqdm(dataloader, leave=False)):
@@ -357,7 +361,7 @@ def train_model(config:CovidTrainingConfiguration,
             losses.append((epoch + pct_epoch, loss.item()))
         
             if pct_epoch == 1.0 or epoch + pct_epoch - last_validation > config.validation_frequency:
-                logging.info("Generating validation stats")
+                logger.info("Generating validation stats")
 
                 vloss, vacc, v_conf, v_outputs = get_validation_loss()
                 model.train()
@@ -367,14 +371,16 @@ def train_model(config:CovidTrainingConfiguration,
                 ), index=False)
 
                 validation_stats.append([epoch+pct_epoch, vloss, vacc, v_conf])
-                logging.info(f"Validation loss at {epoch+pct_epoch:0.1f} = {vloss:0.4f}")
+                learning_rates.append((epoch + pct_epoch, optim.param_groups[0]['lr']))
+
+                logger.info(f"Validation loss at {epoch+pct_epoch:0.1f} = {vloss:0.4f}")
                 scheduler.step(vloss)
 
-                fig = get_performance_plots(losses, validation_stats)
+                fig = get_performance_plots(losses, validation_stats, learning_rates)
                 fig_path = os.path.join(config.root_folder, f'outputs/{run_name}_performance.png')
                 fig.savefig(fig_path)
                 plt.close(fig)
-                logging.info(f'Generated validation stats -- plot saved to "{fig_path}"')
+                logger.info(f'Generated validation stats -- plot saved to "{fig_path}"')
                 last_validation = epoch + pct_epoch
 
             if check_interrupted is not None and check_interrupted():
@@ -382,12 +388,13 @@ def train_model(config:CovidTrainingConfiguration,
                 break
 
         if interrupted:
-            logging.info("user interrupt received -- quitting")
+            logger.info("user interrupt received -- quitting")
             break
 
         state = {
             'epoch': epoch,
             'losses': losses,
+            'learning_rates': learning_rates,
             'validation_stats': validation_stats,
             'last_validation': last_validation,
             'model': model.state_dict(),
@@ -397,11 +404,11 @@ def train_model(config:CovidTrainingConfiguration,
         }
 
         if not disable_checkpointing:
-            logging.info('Saving checkpoint')
+            logger.info('Saving checkpoint')
             with gzip.open(os.path.join(config.root_folder, f'checkpoints/model_{run_name}_{epoch:03}.pkl.gz'), 'wb') as f:
                 T.save(state, f)
             
-        logging.info('Saving state')
+        logger.info('Saving state')
         with gzip.open(training_state_path + ".gz", 'wb') as f:
             T.save(state, f)
     

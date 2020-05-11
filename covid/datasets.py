@@ -13,6 +13,8 @@ import itertools
 from .utils import CHEMPROP_ARGS
 import logging
 
+logger = logging.getLogger(__name__)
+
 __ALL__ = [
     'collate_stitch_data', 
     'StitchDataset',
@@ -151,7 +153,7 @@ def _old_create_data_split(src_folder,
                       max_per_item=0.0025):
     data = StitchDataset(src_folder)
     data._deferred_load()
-    logging.debug(f"Creating {pct_train} data split - {dst_train_folder} ; {dst_test_folder}")
+    logger.debug(f"Creating {pct_train} data split - {dst_train_folder} ; {dst_test_folder}")
 
     while True:
         all_data = data.all_data.copy()
@@ -168,7 +170,7 @@ def _old_create_data_split(src_folder,
             lambda x: x.sample(min(x.shape[0], max_num_per_item), replace=False)
         ).reset_index(drop=True)
 
-        logging.debug(f"{all_data.shape[0]}/{data.all_data.shape[0]} items remaining after max concentration filter")
+        logger.debug(f"{all_data.shape[0]}/{data.all_data.shape[0]} items remaining after max concentration filter")
 
         is_selected = pd.Series(False, index=all_data.index)
 
@@ -214,15 +216,15 @@ def _old_create_data_split(src_folder,
         )
         
         if (to_exclude & ~is_selected).mean() > max_to_drop:
-            logging.debug(f"Percent to drop outside of tolerance ({(to_exclude & ~is_selected).mean()}) -- retrying...")
+            logger.debug(f"Percent to drop outside of tolerance ({(to_exclude & ~is_selected).mean()}) -- retrying...")
             continue
 
         if is_selected.mean() <= (1-pct_train) + tolerance:
             break
         
-        logging.debug(f"Test set outside of tolerance -- {is_selected.mean():0.3%} -- retrying...")
+        logger.debug(f"Test set outside of tolerance -- {is_selected.mean():0.3%} -- retrying...")
 
-    logging.debug(f"Test set selected -- {is_selected.mean():0.3%} (dropping {(to_exclude & ~is_selected).mean():0.3%})")
+    logger.debug(f"Test set selected -- {is_selected.mean():0.3%} (dropping {(to_exclude & ~is_selected).mean():0.3%})")
     
     test_chem = {k:data.all_chemicals[k] for k in test_data['item_id_a'].unique()}
     test_prot = {k:data.all_proteins[k] for k in test_data['item_id_b'].unique()}
@@ -272,7 +274,7 @@ def create_data_split(src_folder,
                       max_per_item=0.0025):
     data = StitchDataset(src_folder)
     data._deferred_load()
-    logging.debug(f"Creating {pct_train} data split - {dst_train_folder} ; {dst_test_folder}")
+    logger.debug(f"Creating {pct_train} data split - {dst_train_folder} ; {dst_test_folder}")
 
     while True:
         all_data = data.all_data.copy()
@@ -345,16 +347,16 @@ def create_data_split(src_folder,
         )
 
         if num_dropped / data.all_data.shape[0] > max_to_drop:
-            logging.debug(f"Percent to drop outside of tolerance ({num_dropped / len(data):0.2%}) -- retrying")
+            logger.debug(f"Percent to drop outside of tolerance ({num_dropped / len(data):0.2%}) -- retrying")
             continue
 
         if pct_train - tolerance < pct_in_training() < pct_train + tolerance:
             break
 
-        logging.debug(f"Test set outside of tolerance -- {1-pct_in_training():0.3%} -- retrying...")
+        logger.debug(f"Test set outside of tolerance -- {1-pct_in_training():0.3%} -- retrying...")
 
 
-    logging.debug(
+    logger.debug(
         f"Test set selected -- {1-pct_in_training():0.3%} "
         + f"(dropping {num_dropped/len(data):0.3%}, "
         + f"truncated {dropped_for_concentration/len(data):0.3%})"
