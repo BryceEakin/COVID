@@ -246,7 +246,7 @@ class ChemicalMiddleModel(nn.Module):
             expanded_context = expanded_context[b2a]
 
         # Message passing
-        for depth in range(self.depth - 1):
+        for depth in range(self.depth):
             if self.undirected:
                 message = (message + message[b2revb]) / 2
                 
