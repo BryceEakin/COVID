@@ -123,12 +123,6 @@ class ScaleSafeBatchNorm1d(nn.BatchNorm1d):
 
             self.burn_in_left -= 1
             if self.burn_in_left == 0:
-                self.bucket_counts = None
-                self.log_bucket_counts = None
-                self.running_lin_mean = None
-                self.running_log_mean = None
-                self.running_lin_var = None
-                self.running_log_var = None
                 self.is_log = T.round(self.is_log)
             
 

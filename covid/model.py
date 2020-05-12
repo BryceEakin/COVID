@@ -91,7 +91,7 @@ class CovidModel(nn.Module):
 
         
         self.final_layers = nn.Sequential(
-            nn.BatchNorm1d(protein_output_dim + chem_hidden_size + chem_mol_feature_dim),
+            ScaleSafeBatchNorm1d(protein_output_dim + chem_hidden_size + chem_mol_feature_dim),
             nn.Dropout(dropout),
             SiLU(),
             nn.Linear(protein_output_dim + chem_hidden_size + chem_mol_feature_dim, context_dim * 2),

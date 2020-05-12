@@ -91,7 +91,8 @@ class CovidTrainingConfiguration():
 
     # LR Scheduler Configuration
     optim_scheduler_factor: float = 0.1**0.125
-    optim_scheduler_patience: int = 4
+    optim_scheduler_patience: int = 10
+    optim_scheduler_cooldown: int = 10
     optim_minimum_lr: float = 1e-7
 
     # Model hyperparameters
@@ -191,6 +192,7 @@ def _create_optimizer_and_schedulers(model, config):
         optim, 
         factor=config.optim_scheduler_factor, 
         patience=config.optim_scheduler_patience,
+        cooldown=config.optim_scheduler_cooldown,
         min_lr=config.optim_minimum_lr
     )
 
