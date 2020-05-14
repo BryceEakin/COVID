@@ -1,5 +1,5 @@
 from sanic import Sanic
-from sanic.response import html, file_stream, text, redirect, json
+from sanic.response import html, file_stream, text, redirect, json, file
 from sanic.exceptions import NotFound
 
 import sys, os
@@ -26,6 +26,9 @@ from collections import Counter, defaultdict
 
 from pprint import pformat
 import humanize
+
+import torch as T
+import gzip
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +80,16 @@ def fig_to_base64(fig, close=False, **save_kwargs):
 
 app = Sanic(name='CovidProject')
 TRIALS_REFRESHED = datetime.now()
-TRIALS = MongoTrials('mongo://localhost:1234/covid/jobs')
+TRIALS = None #MongoTrials('mongo://localhost:1234/covid/jobs')
+
+def _refresh_trials():
+    global TRIALS, TRIALS_REFRESHED
+
+    if TRIALS is None:
+        TRIALS = MongoTrials('mongo://localhost:1234/covid/jobs')
+
+    TRIALS_REFRESHED = datetime.now()
+    TRIALS.refresh()
 
 @app.get("/training-state/<run_id>")
 async def get_training_state(request, run_id):
@@ -119,22 +131,18 @@ def create_delete_prompt(desc = "Something"):
         
 @app.get('/delete-failed')
 async def delete_failed(request):
-    global TRIALS, TRIALS_REFRESHED
+    global TRIALS
 
     if request.args.get("really", "no") == "yes":
         jobs = MongoClient('localhost', 1234).covid.jobs
         to_delete = list(jobs.find({'result.status':'fail'}))
         for obj in to_delete:
             jobs.find_one_and_delete({'_id':obj['_id']})
-        TRIALS_REFRESHED = datetime.now()
-        TRIALS.refresh()
-        return redirect("/status")
+        return redirect("/status?refresh=True")
     return html(create_delete_prompt("FAILED JOBS"))
 
 @app.get('/delete-gen/<gen>')
 async def delete_gen(request, gen):
-    global TRIALS, TRIALS_REFRESHED
-
     if request.args.get('really', 'no') == 'yes':
         gen_trials = MongoTrials('mongo://localhost:1234/covid/jobs', f'covid-{gen}')
         gen_trials.refresh()
@@ -144,13 +152,11 @@ async def delete_gen(request, gen):
 
 @app.get('/delete-all')
 async def delete_all_yes_really(request):
-    global TRIALS, TRIALS_REFRESHED
+    global TRIALS
 
     if request.args.get('really', 'no') == 'yes':
-        TRIALS.refresh()
-        TRIALS_REFRESHED = datetime.now()
+        _refresh_trials()
         TRIALS.delete_all()
-        TRIALS.refresh()
         return redirect(f"/status/?refresh=true")
     return html(create_delete_prompt(f"ALL DATA AND JOBS"))
 
@@ -182,8 +188,7 @@ async def get_status(request):
     global TRIALS, TRIALS_REFRESHED
 
     if 'refresh' in request.args:
-        TRIALS.refresh()
-        TRIALS_REFRESHED = datetime.now()
+        _refresh_trials()
 
     state_lookup = {getattr(hyperopt, k):k for k in ['JOB_STATE_NEW', 'JOB_STATE_ERROR', 'JOB_STATE_RUNNING', 'JOB_STATE_DONE']}
     state_lookup[-1] = 'JOB_STATE_Prev-Level Hints'
@@ -252,7 +257,7 @@ async def get_status(request):
 
 @app.get("/best-trials/raw")
 async def trials_raw(request):
-    global TRIALS, TRIALS_REFRESHED
+    global TRIALS
 
     n = request.args.get('n')
     tid = request.args.get('tid')
@@ -262,8 +267,7 @@ async def trials_raw(request):
         n = 0
 
     if 'refresh' in request.args:
-        TRIALS.refresh()
-        TRIALS_REFRESHED = datetime.now()
+        _refresh_trials()
         
     if len(TRIALS.trials) == 0:
         redirect(f"/status")
@@ -323,8 +327,6 @@ async def trials_raw(request):
 
 @app.get("/delete-trial/<id>")
 async def delete_trial(request, id):
-    global TRIALS, TRIALS_REFRESHED
-
     jobs = MongoClient('localhost', 1234).covid.jobs
     job = jobs.find_one({'_id':ObjectId(id)})
 
@@ -333,11 +335,17 @@ async def delete_trial(request, id):
 
     if request.args.get("really", "no") == "yes":
         jobs.find_one_and_delete({'_id':ObjectId(id)})
-        TRIALS_REFRESHED = datetime.now()
-        TRIALS.refresh()
-        return redirect("/status")
+        
+        return redirect("/status?refresh=yes")
     return html(create_delete_prompt(f"JOB {job['tid']}"))
 
+@app.get("/local-state/<label>")
+async def get_local_state(request, label):
+    if os.path.exists(f"./outputs/{label}_performance.png"):
+        return await file(
+            f"./outputs/{label}_performance.png"
+        )
+    raise NotFound("No state exists for that id")
 
 @app.get("/best-trials")
 async def get_current_best(request):
@@ -429,7 +437,11 @@ async def get_current_best(request):
         n = 0
         
     if 'training_loss_hist' in tr['result']:
-        fig = get_performance_plots(tr['result']['training_loss_hist'], tr['result']['validation_stats'])
+        fig = get_performance_plots(
+            tr['result']['training_loss_hist'], 
+            tr['result']['validation_stats'],
+            tr['result'].get('learning_rates')
+        )
         img = fig_to_base64(fig, close=True).decode('utf-8')
         
         stats = get_performance_stats(tr['result']['validation_stats'])

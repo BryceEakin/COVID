@@ -61,13 +61,36 @@ def plot_learning_rate(ax, lr_x, lr_y):
     ax = ax.twinx()
     ax.set_yscale('log')
     ax.plot(lr_x, lr_y, ls=':', lw=1.0, c='darkturquoise', label='lr (right axis)')
-    ax.set_ylim((1e-8, 1e-4))
+    ax.set_ylim((1e-8, 1e-3))
     #ax.set_ylabel("Learning Rate")
     ax.legend()
 
 def plot_stat(ax, x, stat, title, ylim=(0.0,1.0)):
+    period = max(1, int(len(x)//50))
+        
+    if period > 1:
+        x = np.reshape(x[:((len(x)//period)*period)],(-1,period)).mean(1)
+
     for i, name in enumerate(MODE_NAMES):
-        ax.plot(x, stat[:,i], lw=(2.0 if name == 'Inhibition' else 0.5), label=name)
+        if period > 1:
+            y = stat[:,i]
+            y_grouped = np.reshape(y[:((len(y)//period)*period)],(-1,period))
+            y = y_grouped.mean(1)
+            yerr = np.abs(np.percentile(y_grouped, axis=1, q=[0.05,0.95]) - y)
+            ax.errorbar(
+                x, 
+                y,
+                lw=(2.0 if name == 'Inhibition' else 0.5), 
+                yerr=yerr, 
+                elinewidth=(0.75 if name == 'Inhibition' else 0.25), 
+                capsize=3, 
+                capthick=(0.75 if name == 'Inhibition' else 0.25), 
+                errorevery=1,
+                label=name
+            )
+        else:
+            ax.plot(x, stat[:,i], lw=(2.0 if name == 'Inhibition' else 0.5), label=name)
+
         ax.set_ylim(ylim)
     ax.legend(loc='best')
     ax.set_ylabel(title)
@@ -111,7 +134,7 @@ def get_performance_plots(losses, validation_stats, learning_rates = None, perio
         plot_stat(axes[1,0], valid_x, stats['precision'], 'Precision')
         plot_stat(axes[1,1], valid_x, stats['recall'], 'Recall')
         plot_stat(axes[2,0], valid_x, stats['f1'], 'F1')
-        plot_stat(axes[2,1], valid_x, stats['mcc'], "MCC / Pearson's Phi")
+        plot_stat(axes[2,1], valid_x, stats['mcc'], "MCC / Pearson's Phi", ylim=(-0.5, 1.0))
         
     return fig
 

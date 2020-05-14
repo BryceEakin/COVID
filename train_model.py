@@ -16,7 +16,22 @@ if __name__ == '__main__':
     config = CovidTrainingConfiguration()
     config.verbosity = logging.DEBUG
 
+    config.training_fold = 1
+
     config.optim_adam_betas = (0.992, 0.9995)
+    config.optim_type = 'lcadam'
+    #config.optim_type = 'sgd'
+    config.optim_initial_lr = 1e-4
+    
+    config.chem_messages_per_pass = 2
+    config.chem_hidden_size = 128
+    config.negotiation_passes = 3
+    config.protein_attention_heads = 16
+    config.protein_attention_layers = 2
+    config.optim_warmup_override = 100
+    config.protein_output_use_attention = False
+    config.protein_base_dim = 32
+
 
     if os.name == 'nt' and False:
         run_thread = threading.Thread(
@@ -41,4 +56,4 @@ if __name__ == '__main__':
         print("Trying to quit....")
         run_thread.join()
     else:
-        train_model(config, debug=True)
+        train_model(config, debug=True, run_name='train_fold01a')

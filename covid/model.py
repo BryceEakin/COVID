@@ -198,8 +198,17 @@ def run_model(model, batch, device, mask_nonfinite=True):
     chem_features = chem_features.to(device)
     proteins = proteins.to(device)
 
+    # Confidence-weighted
     weights = (target * 0.0015).clamp(1e-3, 1.0)
-    weights[target == 0] = 1.0 #0.5
+
+    # Handle different class frequencies / confidences
+    weights *= T.tensor([[2.01, 0.45, 3.90, 0.59, 2.82]])
+
+    weights[target == 0] = 0.5
+
+    # Make inhibition equal to all other tasks combined
+    weights[:,3] *= 4  
+
     weights = weights.to(device)
     
     target = (1.0*(target > 0)).to(device)

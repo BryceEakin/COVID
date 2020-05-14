@@ -15,6 +15,7 @@ from .datasets import StitchDataset, create_data_split, create_dataloader
 from .model import (CovidModel, run_model)
 from .modules.chemistry import MPNEncoder
 from .schedulers import LinearWarmupScheduler
+from .optim import LocallyCyclicAdam
 from .reporting import get_performance_plots, calculate_average_loss_and_accuracy
 from .utils import is_notebook
 
@@ -85,14 +86,17 @@ class CovidTrainingConfiguration():
 
     # Optimizer Configuration
     optim_initial_lr: float = 1e-5
+    optim_type: str = 'adam'
     optim_adam_betas: typ.Tuple[int, int] = (0.98, 0.995)
     optim_adam_eps: float = 1e-5
+    optim_sgd_momentum: float = 0.9
     optim_warmup_override: typ.Union[None, int] = None # Applies 2/(1-Beta2) by default
 
     # LR Scheduler Configuration
     optim_scheduler_factor: float = 0.1**0.125
     optim_scheduler_patience: int = 10
     optim_scheduler_cooldown: int = 10
+    optim_scheduler_burn_in: float = 2
     optim_minimum_lr: float = 1e-7
 
     # Model hyperparameters
@@ -104,7 +108,7 @@ class CovidTrainingConfiguration():
     chem_undirected: bool = False
     chem_atom_messages: bool = False
 
-    protein_base_dim: int = 8
+    protein_base_dim: int = 16
     protein_output_dim: int = 128
     protein_nonlinearity: str = 'silu'
     protein_downscale_nonlinearity: str = 'tanh'
@@ -177,12 +181,26 @@ def _create_model(config, debug=False):
 def _create_optimizer_and_schedulers(model, config):
     logger.debug("Initializing optimizers/schedulers")
 
-    optim = T.optim.Adam(
-        model.parameters(), 
-        lr=config.optim_initial_lr, 
-        betas=config.optim_adam_betas,
-        eps=config.optim_adam_eps
-    )
+    if config.optim_type == 'adam':
+        optim = T.optim.Adam(
+            model.parameters(), 
+            lr=config.optim_initial_lr, 
+            betas=config.optim_adam_betas,
+            eps=config.optim_adam_eps
+        )
+    elif config.optim_type == 'sgd':
+        optim = T.optim.SGD(
+            model.parameters(),
+            lr=config.optim_initial_lr,
+            momentum=config.optim_sgd_momentum
+        )
+    elif config.optim_type == 'lcadam':
+        optim = LocallyCyclicAdam(
+            model.parameters(),
+            lr=config.optim_initial_lr,
+            betas=config.optim_adam_betas,
+            eps=config.optim_adam_eps
+        )
 
     warmup = LinearWarmupScheduler(
         optim, 
@@ -377,7 +395,9 @@ def train_model(config:CovidTrainingConfiguration,
                 learning_rates.append((epoch + pct_epoch, optim.param_groups[0]['lr']))
 
                 logger.info(f"Validation loss at {epoch+pct_epoch:0.1f} = {vloss:0.4f}")
-                scheduler.step(vloss)
+
+                if epoch + pct_epoch >= config.optim_scheduler_burn_in:
+                    scheduler.step(vloss)
 
                 fig = get_performance_plots(losses, validation_stats, learning_rates)
                 fig_path = os.path.join(config.root_folder, f'outputs/{run_name}_performance.png')
