@@ -10,6 +10,8 @@ from .constants import MODE_NAMES
 from .model import run_model
 from .utils import is_notebook
 
+import sklearn.metrics as metrics
+
 if is_notebook():
     from tqdm.notebook import tqdm
 else:
@@ -95,6 +97,22 @@ def plot_stat(ax, x, stat, title, ylim=(0.0,1.0)):
     ax.legend(loc='best')
     ax.set_ylabel(title)
 
+def plot_auc(ax, pred_df):
+    for mode in MODE_NAMES:
+        y = pred_df[mode]
+        y_hat = pred_df['pred_' + mode]
+        fpr, tpr, threshold = metrics.roc_curve(y, y_hat)
+        roc_auc = metrics.auc(fpr, tpr)
+
+        ax.plot(fpr, tpr, lw=(2.0 if mode == 'Indibition' else 0.5), alpha=0.6, label=f"{mode}={roc_auc:0.2f}")
+
+    ax.plot((0,1), (0,1), lw=0.25, ls=':', color='black')
+    ax.set_ylim((0,1))
+    ax.set_xlim((0,1))
+    ax.set_ylabel('tpr')
+    ax.set_xlabel('fpr')
+
+
 def get_performance_stats(validation_stats):
     valid_x, valid_y, valid_acc, valid_conf = zip(*validation_stats)
     tp, fp, fn, tn = zip(*valid_conf)
@@ -114,7 +132,8 @@ def get_performance_stats(validation_stats):
         'mcc': mcc
     }
 
-def get_performance_plots(losses, validation_stats, learning_rates = None, period=None):
+
+def get_performance_plots(losses, validation_stats, learning_rates = None, pred_df = None, period=None):
     loss_x, loss_y = zip(*losses)
     valid_x, valid_y, valid_acc, valid_conf = zip(*validation_stats)
     
@@ -130,7 +149,11 @@ def get_performance_plots(losses, validation_stats, learning_rates = None, perio
         stats = get_performance_stats(validation_stats)
         valid_x = stats['epoch']
         
-        plot_stat(axes[0,1], valid_x, stats['accuracy'], 'Accuracy')
+        if pred_df is None:
+            plot_stat(axes[0,1], valid_x, stats['accuracy'], 'Accuracy')
+        else:
+            plot_auc(axes[0,1], pred_df)
+
         plot_stat(axes[1,0], valid_x, stats['precision'], 'Precision')
         plot_stat(axes[1,1], valid_x, stats['recall'], 'Recall')
         plot_stat(axes[2,0], valid_x, stats['f1'], 'F1')

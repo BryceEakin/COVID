@@ -399,7 +399,7 @@ def train_model(config:CovidTrainingConfiguration,
                 if epoch + pct_epoch >= config.optim_scheduler_burn_in:
                     scheduler.step(vloss)
 
-                fig = get_performance_plots(losses, validation_stats, learning_rates)
+                fig = get_performance_plots(losses, validation_stats, learning_rates, v_outputs)
                 fig_path = os.path.join(config.root_folder, f'outputs/{run_name}_performance.png')
                 fig.savefig(fig_path)
                 plt.close(fig)
