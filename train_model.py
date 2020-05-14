@@ -16,7 +16,7 @@ if __name__ == '__main__':
     config = CovidTrainingConfiguration()
     config.verbosity = logging.DEBUG
 
-    config.training_fold = 0
+    config.training_fold = 1
 
     config.optim_adam_betas = (0.992, 0.9995)
     config.optim_type = 'lcadam'
@@ -56,4 +56,4 @@ if __name__ == '__main__':
         print("Trying to quit....")
         run_thread.join()
     else:
-        train_model(config, debug=True, run_name='train_fold00a')
+        train_model(config, debug=True, run_name='train_fold01a')
