@@ -54,8 +54,8 @@ def plot_loss(ax, loss_x, loss_y, valid_x, valid_y, period=None):
 
     ax.plot(x, y, label='model (validation)', c='C1')
 
-    ax.plot((x[0], x[-1]), (0.422, 0.422), c='g', ls=':', lw=1.5, label='random baseline')
-    ax.set_ylim((0.0, 1.0))
+    #ax.plot((x[0], x[-1]), (0.422, 0.422), c='g', ls=':', lw=1.5, label='random baseline')
+    ax.set_ylim((0.0, 2.0))
     ax.legend()
     ax.set_ylabel('Loss')
 
@@ -104,13 +104,14 @@ def plot_auc(ax, pred_df):
         fpr, tpr, threshold = metrics.roc_curve(y, y_hat)
         roc_auc = metrics.auc(fpr, tpr)
 
-        ax.plot(fpr, tpr, lw=(2.0 if mode == 'Indibition' else 0.5), alpha=0.6, label=f"{mode}={roc_auc:0.2f}")
+        ax.plot(fpr, tpr, lw=(2.0 if mode == 'Inhibition' else 0.5), alpha=0.6, label=f"{mode}={roc_auc:0.2f}")
 
     ax.plot((0,1), (0,1), lw=0.25, ls=':', color='black')
     ax.set_ylim((0,1))
     ax.set_xlim((0,1))
     ax.set_ylabel('tpr')
     ax.set_xlabel('fpr')
+    ax.legend()
 
 
 def get_performance_stats(validation_stats):
