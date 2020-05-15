@@ -103,7 +103,6 @@ class CovidModel(nn.Module):
         )
 
         self.num_passes = negotiation_passes
-        self.chem_initialization_passes = chem_initialization_passes
 
         self.last_debug_checks = []
         self.debug = debug
