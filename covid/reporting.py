@@ -158,7 +158,7 @@ def get_performance_plots(losses, validation_stats, learning_rates = None, pred_
         plot_stat(axes[1,0], valid_x, stats['precision'], 'Precision')
         plot_stat(axes[1,1], valid_x, stats['recall'], 'Recall')
         plot_stat(axes[2,0], valid_x, stats['f1'], 'F1')
-        plot_stat(axes[2,1], valid_x, stats['mcc'], "MCC / Pearson's Phi", ylim=(-0.5, 1.0))
+        plot_stat(axes[2,1], valid_x, stats['mcc'], "MCC / Pearson's Phi")
         
     return fig
 

@@ -28,7 +28,7 @@ class LocallyCyclicAdam(Optimizer):
     """
 
     def __init__(self, params, lr=1e-3, betas=(0.9, 0.999), eps=1e-8,
-                 weight_decay=0, amsgrad=False, cycle_exp=10, cycle_incr=(1e-3, 0.1)):
+                 weight_decay=0, amsgrad=False, cycle_exp=100, cycle_incr_exp=(-8, -1.5)):
         if not 0.0 <= lr:
             raise ValueError("Invalid learning rate: {}".format(lr))
         if not 0.0 <= eps:
@@ -39,15 +39,15 @@ class LocallyCyclicAdam(Optimizer):
             raise ValueError("Invalid beta parameter at index 1: {}".format(betas[1]))
         defaults = dict(lr=lr, betas=betas, eps=eps,
                         weight_decay=weight_decay, amsgrad=amsgrad,
-                        cycle_pos=-2, cycle_exp=cycle_exp, cycle_incr=cycle_incr)
+                        cycle_pos=-2, cycle_exp=cycle_exp, cycle_incr_exp=cycle_incr_exp)
         super().__init__(params, defaults)
 
     def __setstate__(self, state):
         super().__setstate__(state)
         for group in self.param_groups:
             group.setdefault('amsgrad', False)
-            group.setdefault('cycle_exp', 10)
-            group.setdefault('cycle_incr', (1e-3, 0.1))
+            group.setdefault('cycle_exp', 100)
+            group.setdefault('cycle_incr_exp', (-5, -2))
 
     def step(self, closure=None):
         """Performs a single optimization step.
@@ -82,7 +82,7 @@ class LocallyCyclicAdam(Optimizer):
                         # Maintains max of all exp. moving avg. of sq. grad. values
                         state['max_exp_avg_sq'] = torch.zeros_like(p.data)
 
-                    state['cycle_pos'] = -2
+                    state['cycle_pos'] = random.uniform(-math.pi, 0)
 
                 exp_avg, exp_avg_sq = state['exp_avg'], state['exp_avg_sq']
                 if amsgrad:
@@ -109,7 +109,7 @@ class LocallyCyclicAdam(Optimizer):
                 bias_correction2 = 1 - beta2 ** state['step']
 
                 local_cycle_effect = 10 ** ((0.5 * math.sin(state['cycle_pos']) + 0.5)**group['cycle_exp'])
-                state['cycle_pos'] += random.uniform(*group['cycle_incr'])
+                state['cycle_pos'] += 10 ** random.uniform(*group['cycle_incr_exp'])
                 step_size = group['lr'] * local_cycle_effect * math.sqrt(bias_correction2) / bias_correction1
 
                 p.data.addcdiv_(-step_size, exp_avg, denom)

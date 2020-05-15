@@ -88,7 +88,7 @@ class CovidTrainingConfiguration():
     optim_initial_lr: float = 1e-5
     optim_type: str = 'adam'
     optim_adam_betas: typ.Tuple[int, int] = (0.98, 0.995)
-    optim_adam_eps: float = 1e-5
+    optim_adam_eps: float = 1e-4
     optim_sgd_momentum: float = 0.9
     optim_warmup_override: typ.Union[None, int] = None # Applies 2/(1-Beta2) by default
 
@@ -101,7 +101,7 @@ class CovidTrainingConfiguration():
 
     # Model hyperparameters
     chem_layers_per_message: int = 1
-    chem_messages_per_pass: int = 1
+    chem_messages_per_pass: int = 3
     chem_hidden_size: int = 64
     chem_bias: bool = False
     chem_nonlinearity: str = 'ReLU'
@@ -235,7 +235,7 @@ def _create_dataloaders(config, validation_synth_neg_rate = 0.0):
         drop_last=True,
         neg_rate=validation_synth_neg_rate, 
         num_workers=config.dataloader_num_workers,
-        sample_size = config.batch_size * 50
+        sample_size = config.batch_size * 250
     )
 
     return dataloader, validation_dataloader

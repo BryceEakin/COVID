@@ -103,6 +103,7 @@ class CovidModel(nn.Module):
         )
 
         self.num_passes = negotiation_passes
+        self.chem_initialization_passes = chem_initialization_passes
 
         self.last_debug_checks = []
         self.debug = debug
@@ -207,7 +208,7 @@ def run_model(model, batch, device, mask_nonfinite=True):
     weights[target == 0] = 0.5
 
     # Make inhibition equal to all other tasks combined
-    weights[:,3] *= 4  
+    weights[:,3] *= 4
 
     weights = weights.to(device)
     

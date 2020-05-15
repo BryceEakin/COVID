@@ -211,16 +211,15 @@ def create_protein_model_tail(input_dim=512,
 
     resnet = functools.partial(create_resnet_block_1d, for_protein_batch=True, nonlinearity=nonlinearity)
 
-    if not output_attention:
-        # Take the max on each channel
-        summarizer = nn.Sequential(
-            apply_to_protein_batch(nn.MaxPool1d(100000, ceil_mode=True)),
-            # Convert protein batch to standard batch format
-            ProteinBatchToPaddedBatch(),
-            Squeeze(-1),
-        )
+    # Take the max on each channel
+    summarizer = nn.Sequential(
+        apply_to_protein_batch(nn.MaxPool1d(100000, ceil_mode=True)),
+        # Convert protein batch to standard batch format
+        ProteinBatchToPaddedBatch(),
+        Squeeze(-1),
+    )
 
-    else:
+    if output_attention:
         summarizer = ProteinMHAttentionSummarizer(input_dim, output_attention_heads, output_attention_window)
 
     return nn.Sequential(
